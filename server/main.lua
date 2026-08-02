@@ -1,5 +1,5 @@
 local TMGCore = exports['tmg-core']:GetCoreObject()
-local QBPhone = {}
+local TMGPhone = {}
 local DatabaseReady = false
 
 AddEventHandler('TMGNoSQL:DatabaseReady', function()
@@ -10,8 +10,6 @@ end)
 local AppAlerts = {}
 local MentionedTweets = {}
 local Hashtags = {}
-
-
 local Calls, Adverts, GeneratedPlates = {}, {}, {}
 local TWData = {}
 
@@ -19,14 +17,12 @@ local function GetOnlineStatus(number)
     return TMGCore.Functions.GetPlayerByPhone(number) ~= nil
 end
 
-function QBPhone.AddMentionedTweet(citizenid, TweetData)
+function TMGPhone.AddMentionedTweet(citizenid, TweetData)
     local Player = TMGCore.Functions.GetPlayerByCitizenId(citizenid)
-    
     if Player then
         local currentMentions = Player.PlayerData.metadata["phone_mentions"] or {}
         currentMentions[#currentMentions + 1] = TweetData
         Player.Functions.SetMetaData("phone_mentions", currentMentions)
-        
         TriggerClientEvent('tmg-phone:client:GetMentioned', Player.PlayerData.source, TweetData)
     else
         exports['tmgnosql']:UpdateOne('players', 
@@ -36,73 +32,34 @@ function QBPhone.AddMentionedTweet(citizenid, TweetData)
     end
 end
 
-function QBPhone.SetPhoneAlerts(citizenid, app, alerts)
+function TMGPhone.SetPhoneAlerts(citizenid, app, alerts)
     if not citizenid or not app then return end
+    local Player = TMGCore.Functions.GetPlayerByCitizenId(citizenid)
     
-    local Player = TMGCore.Functions.GetPlayerByCitizenId(citizenid)
-    local newAlertCount = alerts or 1
-
     if Player then
         local currentAlerts = Player.PlayerData.metadata["phone_alerts"] or {}
-        
-        if not alerts then
-            currentAlerts[app] = (currentAlerts[app] or 0) + 1
-        else
-            currentAlerts[app] = alerts
-        end
-
-        Player.Functions.SetMetaData("phone_alerts", currentAlerts)
-        TriggerClientEvent('tmg-phone:client:UpdateAlerts', Player.PlayerData.source, currentAlerts)
-    else
-        local updateQuery = alerts and { ["$set"] = { ["metadata.phone_alerts."..app] = alerts } } 
-                            or { ["$inc"] = { ["metadata.phone_alerts."..app] = 1 } }
-                            
-        exports['tmgnosql']:UpdateOne('players', { citizenid = citizenid }, updateQuery)
-    end
-end
-
-
-function QBPhone.SetPhoneAlerts(citizenid, app, alerts)
-    if not citizenid or not app then return end
-
-    local updateQuery = {}
-    if alerts == nil then
-        updateQuery = { ["$inc"] = { ["metadata.phone_alerts."..app] = 1 } }
-    else
-        updateQuery = { ["$set"] = { ["metadata.phone_alerts."..app] = alerts } }
-    end
-
-    exports['tmgnosql']:UpdateOne('players', { citizenid = citizenid }, updateQuery)
-
-    local Player = TMGCore.Functions.GetPlayerByCitizenId(citizenid)
-    if Player then
-        local currentAlerts = Player.PlayerData.metadata["phone_alerts"] or {}
-        
         if alerts == nil then
             currentAlerts[app] = (currentAlerts[app] or 0) + 1
         else
             currentAlerts[app] = alerts
         end
-
         Player.Functions.SetMetaData("phone_alerts", currentAlerts)
         TriggerClientEvent('tmg-phone:client:UpdateAlerts', Player.PlayerData.source, currentAlerts)
+    else
+        local updateQuery = alerts and { ["$set"] = { ["metadata.phone_alerts."..app] = alerts } }
+                             or { ["$inc"] = { ["metadata.phone_alerts."..app] = 1 } }
+        exports['tmgnosql']:UpdateOne('players', { citizenid = citizenid }, updateQuery)
     end
 end
 
-
 local function SplitStringToArray(str)
     if not str or type(str) ~= "string" then return {} end
-    
     local retval = {}
     for i in string.gmatch(str, '%S+') do
         retval[#retval + 1] = i:gsub('[%c]', '') 
     end
-    
     return retval
 end
-
-
-
 
 local npcNames = {
     { name = 'Bailey Sykes', citizenid = 'DSH091G93' },
@@ -119,7 +76,7 @@ local npcNames = {
     { name = 'Montel Graves', citizenid = 'POL09F193' },
     { name = 'Benjamin Zavala', citizenid = 'TEW0J9193' },
     { name = 'Mia Willis', citizenid = 'YOO09H193' },
-    { name = 'Jacques Schmitt', citizenid = 'QBC091H93' },
+    { name = 'Jacques Schmitt', citizenid = 'TMGC091H93' },
     { name = 'Mert Simmonds', citizenid = 'YDN091H93' },
     { name = 'Rickie Browne', citizenid = 'PJD09D193' },
     { name = 'Deacon Stanley', citizenid = 'RND091D93' },
@@ -137,17 +94,15 @@ local npcNames = {
     { name = 'Aliya William', citizenid = 'KAS009193' },
     { name = 'Rohit West', citizenid = 'SOK091093' },
     { name = 'Skylar Archer', citizenid = 'LOK091093' },
-    { name = 'Jake Kumar', citizenid = 'AKA420609' },
+    { name = 'Jake Kumar', citizenid = 'AKA420609' }
 }
 
 local function GenerateOwnerName(plate)
     if not plate then return npcNames[math.random(1, #npcNames)] end
-
     local seed = 0
     for i = 1, #plate do
         seed = seed + string.byte(plate, i)
     end
-
     local index = (seed % #npcNames) + 1
     return npcNames[index]
 end
@@ -162,7 +117,6 @@ end
 
 local function sendNewMailToOffline(citizenid, mailData)
     if not citizenid or not mailData then return end
-    
     local mailId = GenerateMailId()
     local mailDocument = {
         citizenid = citizenid,
@@ -172,44 +126,32 @@ local function sendNewMailToOffline(citizenid, mailData)
         mailid = mailId,
         read = 0,
         button = mailData.button,
-        date = os.time() 
+        date = os.time() * 1000
     }
-
     exports['tmgnosql']:SaveToCollection('player_mails', mailDocument)
-
     local Player = TMGCore.Functions.GetPlayerByCitizenId(citizenid)
     if Player then
         local src = Player.PlayerData.source
-        
         TriggerClientEvent('tmg-phone:client:NewMailNotify', src, mailData)
-
         local mails = exports['tmgnosql']:Find('player_mails', 
             { citizenid = citizenid }, 
-            { sort = { date = -1 }, limit = 50 } 
+            { sort = { date = -1 }, limit = 50 }
         )
-        
         TriggerClientEvent('tmg-phone:client:UpdateMails', src, mails)
     end
 end
-
 exports('sendNewMailToOffline', sendNewMailToOffline)
-
-
 
 TMGCore.Functions.CreateCallback("tmg-phone:server:GetInvoices", function(source, cb)
     local Player = TMGCore.Functions.GetPlayer(source)
     if not Player then return cb({}) end
-
     local cid = Player.PlayerData.citizenid
-
     local invoices = exports['tmgnosql']:Find('phone_invoices', { citizenid = cid })
-    
     if not invoices or #invoices == 0 then return cb({}) end
 
     for _, invoice in pairs(invoices) do
-        local SenderCID = invoice.sender
+        local SenderCID = invoice.sendercitizenid
         local SenderPly = TMGCore.Functions.GetPlayerByCitizenId(SenderCID)
-
         if SenderPly then
             invoice.number = SenderPly.PlayerData.charinfo.phone
         else
@@ -217,47 +159,35 @@ TMGCore.Functions.CreateCallback("tmg-phone:server:GetInvoices", function(source
                 { citizenid = SenderCID }, 
                 { projection = { ["charinfo.phone"] = 1 } }
             )
-            
-            invoice.number = result and result.charinfo.phone or "Unknown"
+            invoice.number = result and result.charinfo and result.charinfo.phone or "Unknown"
         end
     end
-
     cb(invoices)
 end)
 
-
 TMGCore.Functions.CreateCallback('tmg-phone:server:GetCallState', function(_, cb, ContactData)
     local Target = TMGCore.Functions.GetPlayerByPhone(ContactData.number)
-    
-    if not Target then 
-        return cb(false, false) 
-    end
-
+    if not Target then return cb(false, false) end
     local cid = Target.PlayerData.citizenid
     local isAvailable = not (Calls[cid] and Calls[cid].inCall)
-
     cb(isAvailable, true)
 end)
-
 
 TMGCore.Functions.CreateCallback('tmg-phone:server:GetPhoneData', function(source, cb)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return cb(nil) end
-
     local cid = Player.PlayerData.citizenid
-    
     local playerMeta = Player.PlayerData.metadata or {}
-    local phoneMeta = playerMeta['phonedata'] or {}
+    local phoneMeta = playerMeta['phonedata'] or playerMeta['phone'] or {}
 
     local PhoneData = {
         Applications = AppAlerts[cid] or {},
         MentionedTweets = MentionedTweets[cid] or {},
         Adverts = Adverts or {},
         Hashtags = Hashtags or {},
-        Tweets = TWData or {}, 
-        InstalledApps = phoneMeta.InstalledApps or {}, 
-        
+        Tweets = TWData or {},
+        InstalledApps = phoneMeta.InstalledApps or {},
         PlayerContacts = {},
         Chats = {},
         Garage = {},
@@ -278,7 +208,7 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:GetPhoneData', function(sourc
     PhoneData.Chats = exports['tmgnosql']:Find('phone_messages', { citizenid = cid }) or {}
     PhoneData.Mails = exports['tmgnosql']:Find('player_mails', { citizenid = cid }, { sort = { date = -1 } }) or {}
 
-    local crypto = exports['tmgnosql']:Find('crypto_transactions', { citizenid = cid }, { sort = { date = -1 }, limit = 20 })
+    local crypto = exports['tmgnosql']:Find('phone_crypto_ledger', { citizenid = cid }, { sort = { time = -1 }, limit = 20 })
     if crypto then
         for _, v in pairs(crypto) do
             PhoneData.CryptoTransactions[#PhoneData.CryptoTransactions + 1] = {
@@ -289,10 +219,8 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:GetPhoneData', function(sourc
     end
 
     PhoneData.Images = exports['tmgnosql']:Find('phone_gallery', { citizenid = cid }, { sort = { date = -1 } }) or {}
-
     cb(PhoneData)
 end)
-
 
 TMGCore.Functions.CreateCallback('tmg-phone:server:PayInvoice', function(source, cb, society, amount, invoiceId, sendercitizenid)
     local src = source
@@ -300,19 +228,16 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:PayInvoice', function(source,
     if not Player then return cb(false) end
 
     local invoice = exports['tmgnosql']:FindOne('phone_invoices', { 
-        id = invoiceId, 
+        invoiceId = invoiceId, 
         citizenid = Player.PlayerData.citizenid 
     })
-
     if not invoice then 
         TriggerClientEvent('TMGCore:Notify', src, "Mainframe: Invoice record not found or already settled.", "error")
         return cb(false) 
     end
 
     if Player.Functions.RemoveMoney('bank', amount, 'paid-invoice-'..invoiceId) then
-        
-        exports['tmgnosql']:DeleteOne('phone_invoices', { id = invoiceId })
-
+        exports['tmgnosql']:DeleteOne('phone_invoices', { invoiceId = invoiceId })
         local commission = 0
         if Config.BillingCommissions[society] then
             commission = TMGCore.Shared.Round(amount * Config.BillingCommissions[society])
@@ -324,7 +249,8 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:PayInvoice', function(source,
             message = string.format('%s %s has paid the invoice of $%s.', Player.PlayerData.charinfo.firstname, Player.PlayerData.charinfo.lastname, amount)
         }
 
-        local SenderPly = TMGCore.Functions.GetPlayerByCitizenId(sendercitizenid)
+        local targetCid = sendercitizenid or invoice.sendercitizenid
+        local SenderPly = TMGCore.Functions.GetPlayerByCitizenId(targetCid)
         if commission > 0 then
             if SenderPly then
                 SenderPly.Functions.AddMoney('bank', commission, 'invoice-commission')
@@ -332,17 +258,15 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:PayInvoice', function(source,
                 senderMailData.message = senderMailData.message .. string.format(' You received a commission of $%s.', commission)
             else
                 exports['tmgnosql']:UpdateOne('players', 
-                    { citizenid = sendercitizenid }, 
+                    { citizenid = targetCid }, 
                     { ["$inc"] = { ["money.bank"] = commission } }
                 )
             end
         end
 
-        exports['tmg-phone']:sendNewMailToOffline(sendercitizenid, senderMailData)
-
+        sendNewMailToOffline(targetCid, senderMailData)
         TriggerEvent("tmg-phone:server:paidInvoice", src, invoiceId)
         exports['tmg-banking']:AddMoney(society, amount, 'Phone invoice')
-        
         cb(true)
     else
         TriggerClientEvent('TMGCore:Notify', src, "Mainframe: Insufficient bank balance for settlement.", "error")
@@ -350,29 +274,19 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:PayInvoice', function(source,
     end
 end)
 
-
 TMGCore.Functions.CreateCallback('tmg-phone:server:DeclineInvoice', function(source, cb, _, _, invoiceId)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return cb(false) end
-
     local cid = Player.PlayerData.citizenid
 
     local invoice = exports['tmgnosql']:FindOne('phone_invoices', { 
-        id = invoiceId, 
-        citizenid = cid,
-        candecline = 1 
+        invoiceId = invoiceId, 
+        citizenid = cid 
     })
-
     if invoice then
         TriggerEvent("tmg-phone:server:declinedInvoice", src, invoiceId)
-
-        exports['tmgnosql']:DeleteOne('phone_invoices', { 
-            id = invoiceId, 
-            citizenid = cid 
-        })
-
-        print("^5[TMG]^7 Invoice "..invoiceId.." declined by "..cid)
+        exports['tmgnosql']:DeleteOne('phone_invoices', { invoiceId = invoiceId, citizenid = cid })
         cb(true)
     else
         TriggerClientEvent('TMGCore:Notify', src, "Mainframe: This invoice cannot be declined.", "error")
@@ -380,68 +294,57 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:DeclineInvoice', function(sou
     end
 end)
 
-
 TMGCore.Functions.CreateCallback('tmg-phone:server:GetContactPictures', function(_, cb, Chats)
     if not Chats or next(Chats) == nil then return cb({}) end
-
     for _, chat in pairs(Chats) do
         local targetData = exports['tmgnosql']:FindOne('players', 
             { ["charinfo.phone"] = chat.number }, 
-            { projection = { ["metadata.phone.profilepicture"] = 1 } }
+            { projection = { ["metadata.phone.profilepicture"] = 1, ["metadata.phonedata.profilepicture"] = 1 } }
         )
-
-        if targetData and targetData.metadata and targetData.metadata.phone then
-            chat.picture = targetData.metadata.phone.profilepicture or 'default'
+        if targetData and targetData.metadata then
+            local phoneMeta = targetData.metadata.phone or targetData.metadata.phonedata or {}
+            chat.picture = phoneMeta.profilepicture or 'default'
         else
             chat.picture = 'default'
         end
     end
-
     cb(Chats)
 end)
 
-
 TMGCore.Functions.CreateCallback('tmg-phone:server:GetContactPicture', function(_, cb, Chat)
     if not Chat or not Chat.number then return cb(Chat) end
-
     local result = exports['tmgnosql']:FindOne('players', 
         { ["charinfo.phone"] = Chat.number }, 
-        { projection = { ["metadata.phone.profilepicture"] = 1 } }
+        { projection = { ["metadata.phone.profilepicture"] = 1, ["metadata.phonedata.profilepicture"] = 1 } }
     )
-
-    if result and result.metadata and result.metadata.phone then
-        Chat.picture = result.metadata.phone.profilepicture or 'default'
+    if result and result.metadata then
+        local phoneMeta = result.metadata.phone or result.metadata.phonedata or {}
+        Chat.picture = phoneMeta.profilepicture or 'default'
     else
         Chat.picture = 'default'
     end
-
     cb(Chat)
 end)
 
-
 TMGCore.Functions.CreateCallback('tmg-phone:server:GetPicture', function(_, cb, number)
     if not number then return cb(nil) end
-
     local result = exports['tmgnosql']:FindOne('players', 
         { ["charinfo.phone"] = number }, 
-        { projection = { ["metadata.phone.profilepicture"] = 1 } }
+        { projection = { ["metadata.phone.profilepicture"] = 1, ["metadata.phonedata.profilepicture"] = 1 } }
     )
-
-    if result and result.metadata and result.metadata.phone then
-        local Picture = result.metadata.phone.profilepicture or 'default'
-        cb(Picture)
+    if result and result.metadata then
+        local phoneMeta = result.metadata.phone or result.metadata.phonedata or {}
+        cb(phoneMeta.profilepicture or 'default')
     else
         cb('default')
     end
 end)
 
-
 TMGCore.Functions.CreateCallback('tmg-phone:server:FetchResult', function(_, cb, search)
     if not search or search == "" then return cb(nil) end
-
     local searchData = {}
     local searchParameters = SplitStringToArray(search)
-    
+
     local query = {
         ["$or"] = {
             { citizenid = { ["$regex"] = search, ["$options"] = "i" } },
@@ -449,7 +352,6 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:FetchResult', function(_, cb,
             { ["charinfo.lastname"] = { ["$regex"] = search, ["$options"] = "i" } }
         }
     }
-
     if #searchParameters > 1 then
         query["$or"] = {
             { ["$and"] = {
@@ -461,19 +363,20 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:FetchResult', function(_, cb,
     end
 
     local players = exports['tmgnosql']:Find('players', query, { 
-        projection = { charinfo = 1, metadata = 1, citizenid = 1 },
+        projection = { charinfo = 1, metadata = 1, citizenid = 1 }, 
         limit = 10 
     })
-
     if players and #players > 0 then
         local cids = {}
         for _, p in ipairs(players) do cids[#cids+1] = p.citizenid end
-        
+
         local apartments = exports['tmgnosql']:Find('apartments', { citizenid = { ["$in"] = cids } })
         local apartmentMap = {}
         for _, apa in pairs(apartments) do apartmentMap[apa.citizenid] = apa end
 
         for _, v in pairs(players) do
+            local meta = v.metadata or {}
+            local licenses = meta.licences or meta.licenses or {}
             searchData[#searchData + 1] = {
                 citizenid = v.citizenid,
                 firstname = v.charinfo.firstname,
@@ -482,8 +385,8 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:FetchResult', function(_, cb,
                 phone = v.charinfo.phone,
                 nationality = v.charinfo.nationality,
                 gender = v.charinfo.gender,
-                warrant = false, 
-                driverlicense = v.metadata.licences and v.metadata.licences.driver or false,
+                warrant = false,
+                driverlicense = licenses.driver or false,
                 appartmentdata = apartmentMap[v.citizenid] or {}
             }
         end
@@ -493,10 +396,8 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:FetchResult', function(_, cb,
     end
 end)
 
-
 TMGCore.Functions.CreateCallback('tmg-phone:server:GetVehicleSearchResults', function(_, cb, search)
     if not search or search == "" then return cb({}) end
-
     local searchData = {}
     local trimmedSearch = string.upper(search:gsub('%s+', '')) 
 
@@ -510,18 +411,16 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:GetVehicleSearchResults', fun
     if vehicleResults and #vehicleResults > 0 then
         local ownerIds = {}
         for _, veh in ipairs(vehicleResults) do ownerIds[#ownerIds+1] = veh.citizenid end
-
         local owners = exports['tmgnosql']:Find('players', 
-            { citizenid = { ["$in"] = ownerIds } },
+            { citizenid = { ["$in"] = ownerIds } }, 
             { projection = { citizenid = 1, ["charinfo.firstname"] = 1, ["charinfo.lastname"] = 1 } }
         )
-
         local ownerMap = {}
         for _, owner in ipairs(owners) do ownerMap[owner.citizenid] = owner.charinfo end
 
         for _, veh in ipairs(vehicleResults) do
             local ownerData = ownerMap[veh.citizenid] or { firstname = "Unknown", lastname = "Owner" }
-            local vehicleInfo = TMGCore.Shared.Vehicles[veh.vehicle]
+            local vehicleInfo = TMGCore.Shared.Vehicles[veh.vehicle] or TMGCore.Shared.Vehicles[joaat(veh.vehicle)]
             
             searchData[#searchData + 1] = {
                 plate = veh.plate,
@@ -535,7 +434,7 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:GetVehicleSearchResults', fun
         if GeneratedPlates[trimmedSearch] then
             searchData[#searchData + 1] = GeneratedPlates[trimmedSearch]
         else
-            local npcOwner = GenerateOwnerName(trimmedSearch) 
+            local npcOwner = GenerateOwnerName(trimmedSearch)
             local npcData = {
                 plate = trimmedSearch,
                 status = true,
@@ -543,14 +442,12 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:GetVehicleSearchResults', fun
                 citizenid = npcOwner.citizenid,
                 label = 'Local Resident'
             }
-            GeneratedPlates[trimmedSearch] = npcData 
+            GeneratedPlates[trimmedSearch] = npcData
             searchData[#searchData + 1] = npcData
         end
     end
-
     cb(searchData)
 end)
-
 
 TMGCore.Functions.CreateCallback('tmg-phone:server:ScanPlate', function(source, cb, plate)
     local src = source
@@ -561,7 +458,6 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:ScanPlate', function(source, 
 
     local cleanPlate = string.upper(plate:gsub('%s+', ''))
     local vehicleData = nil
-
     local result = exports['tmgnosql']:FindOne('player_vehicles', { plate = cleanPlate })
 
     if result then
@@ -569,7 +465,6 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:ScanPlate', function(source, 
             { citizenid = result.citizenid }, 
             { projection = { charinfo = 1 } }
         )
-
         if owner then
             vehicleData = {
                 plate = cleanPlate,
@@ -584,7 +479,7 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:ScanPlate', function(source, 
         if GeneratedPlates[cleanPlate] then
             vehicleData = GeneratedPlates[cleanPlate]
         else
-            local npcInfo = GenerateOwnerName(cleanPlate) 
+            local npcInfo = GenerateOwnerName(cleanPlate)
             vehicleData = {
                 plate = cleanPlate,
                 status = true,
@@ -594,26 +489,16 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:ScanPlate', function(source, 
             GeneratedPlates[cleanPlate] = vehicleData
         end
     end
-
     cb(vehicleData)
 end)
-
 
 TMGCore.Functions.CreateCallback('tmg-phone:server:HasPhone', function(source, cb)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
-    
     if not Player then return cb(false) end
-
     local HasHardware = Player.Functions.GetItemByName('phone')
-
-    if HasHardware and HasHardware.amount > 0 then
-        cb(true)
-    else
-        cb(false)
-    end
+    cb(HasHardware and HasHardware.amount > 0)
 end)
-
 
 TMGCore.Functions.CreateCallback('tmg-phone:server:CanTransferMoney', function(source, cb, amount, iban)
     local src = source
@@ -632,19 +517,15 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:CanTransferMoney', function(s
         { ["charinfo.account"] = iban }, 
         { projection = { citizenid = 1, money = 1 } }
     )
-
     if not targetData then
         TriggerClientEvent('TMGCore:Notify', src, "Mainframe: Invalid IBAN/Account Number.", "error")
         return cb(false)
     end
 
     if Player.Functions.RemoveMoney('bank', transferAmount, "phone-transfer-to-" .. iban) then
-        
         local Receiver = TMGCore.Functions.GetPlayerByCitizenId(targetData.citizenid)
-        
         if Receiver then
             Receiver.Functions.AddMoney('bank', transferAmount, "phone-transfer-from-" .. Player.PlayerData.charinfo.account)
-            
             TriggerClientEvent('tmg-phone:client:TransferMoney', Receiver.PlayerData.source, transferAmount, Receiver.PlayerData.money.bank)
         else
             exports['tmgnosql']:UpdateOne('players', 
@@ -652,13 +533,11 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:CanTransferMoney', function(s
                 { ["$inc"] = { ["money.bank"] = transferAmount } }
             )
         end
-
         cb(true)
     else
         cb(false)
     end
 end)
-
 
 local ServiceJobs = {
     ['lawyer'] = true,
@@ -667,21 +546,17 @@ local ServiceJobs = {
     ['taxi'] = true,
     ['police'] = true,
     ['ambulance'] = true,
-    
 }
 
 TMGCore.Functions.CreateCallback('tmg-phone:server:GetCurrentLawyers', function(_, cb)
     local activeServices = {}
     local allPlayers = TMGCore.Functions.GetPlayers()
-
     for _, src in pairs(allPlayers) do
         local Player = TMGCore.Functions.GetPlayer(src)
         if Player then
             local job = Player.PlayerData.job
-            
-            if ServiceJobs[job.name] and job.onduty then
+            if job and ServiceJobs[job.name] and job.onduty then
                 local char = Player.PlayerData.charinfo
-                
                 activeServices[#activeServices + 1] = {
                     name = char.firstname .. ' ' .. char.lastname,
                     phone = char.phone,
@@ -690,30 +565,21 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:GetCurrentLawyers', function(
             end
         end
     end
-
     cb(activeServices)
 end)
-
 
 TMGCore.Functions.CreateCallback('tmg-phone:server:GetWebhook', function(source, cb)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return cb(nil) end
-
     local activeWebhook = Config.Webhook or WebHook 
 
     if activeWebhook and activeWebhook ~= "" and activeWebhook ~= "SET_YOUR_WEBHOOK_HERE" then
-        print(string.format("^5[TMG Mainframe]^7 Camera Auth requested by %s", Player.PlayerData.citizenid))
-        
         cb(activeWebhook)
     else
-        print("^1[TMG ERROR]^7 Camera Webhook is NOT configured! Photos will fail to upload.")
-        print("^1[FIX]^7 Update 'Config.Webhook' in your configuration BSON/file.")
-        
         cb(nil)
     end
 end)
-
 
 TMGCore.Functions.CreateCallback('tmg-phone:server:UploadToFivemerr', function(source, cb)
     local src = source
@@ -724,10 +590,8 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:UploadToFivemerr', function(s
     local apiToken = FivemerrApiToken or ""
 
     if Config.Fivemerr and apiToken == "" then
-        print("^1[TMG ERROR]^7 Fivemerr is enabled but the API Token is missing.")
         return cb(nil)
     end
-
     if not Config.Fivemerr then
         uploadUrl = Config.Webhook or WebHook
     end
@@ -735,16 +599,11 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:UploadToFivemerr', function(s
     exports['screenshot-basic']:requestClientScreenshot(src, {
         encoding = 'png'
     }, function(err, data)
-        if err then 
-            print("^1[TMG ERROR]^7 Screenshot failed for Player: " .. src)
-            return cb(nil) 
-        end
-
+        if err then return cb(nil) end
         PerformHttpRequest(uploadUrl, function(status, response)
             if status == 200 or status == 201 or status == 204 then
                 cb(response)
             else
-                print("^1[TMG ERROR]^7 Image Upload Failed. Status: " .. (status or "Unknown"))
                 cb(nil)
             end
         end, "POST", json.encode({ image = data }), { 
@@ -754,104 +613,64 @@ TMGCore.Functions.CreateCallback('tmg-phone:server:UploadToFivemerr', function(s
     end)
 end)
 
-
-
-
 RegisterNetEvent('tmg-phone:server:AddAdvert', function(msg, url)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not msg then return end
-
     local cid = Player.PlayerData.citizenid
-    local firstName = Player.PlayerData.charinfo.firstname
-    local lastName = Player.PlayerData.charinfo.lastname
-    
+
     local cleanMsg = msg:gsub('[%<>\"()]', '')
     local cleanUrl = url and url:gsub('[%<>\"()\' $]', '') or ""
 
     local adData = {
         message = cleanMsg,
-        name = "@" .. firstName .. " " .. lastName,
+        name = "@" .. Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname,
         number = Player.PlayerData.charinfo.phone,
         url = cleanUrl,
-        time = os.time() 
+        time = os.time()
     }
-
     Adverts[cid] = adData
     exports['tmgnosql']:UpdateOne('phone_adverts', 
         { citizenid = cid }, 
         { ["$set"] = adData }, 
         { upsert = true }
     )
-
     TriggerClientEvent('tmg-phone:client:UpdateAdverts', -1, Adverts, adData.name)
 end)
-
 
 RegisterNetEvent('tmg-phone:server:DeleteAdvert', function()
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return end
-
     local cid = Player.PlayerData.citizenid
-
     Adverts[cid] = nil
-
     exports['tmgnosql']:DeleteOne('phone_adverts', { citizenid = cid })
-
     TriggerClientEvent('tmg-phone:client:UpdateAdvertsDel', -1, Adverts)
-    
-    
-    print("^5[TMG]^7 Advertisement purged for Citizen: " .. cid)
 end)
-
 
 RegisterNetEvent('tmg-phone:server:SetCallState', function(bool)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
-    
     if not Player then return end
-
     local cid = Player.PlayerData.citizenid
-
     Calls[cid] = Calls[cid] or {}
-    
     Calls[cid].inCall = (bool == true)
-
-    
-    print(string.format("^5[TMG]^7 %s is now %s", cid, bool and "In-Call" or "Available"))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:RemoveMail', function(MailId)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return end
-
     local cid = Player.PlayerData.citizenid
-
-    exports['tmgnosql']:DeleteOne('player_mails', { 
-        mailid = MailId, 
-        citizenid = cid 
-    })
-
-    local mails = exports['tmgnosql']:Find('player_mails', 
-        { citizenid = cid }, 
-        { sort = { date = -1 } } 
-    )
-
+    exports['tmgnosql']:DeleteOne('player_mails', { mailid = MailId, citizenid = cid })
+    local mails = exports['tmgnosql']:Find('player_mails', { citizenid = cid }, { sort = { date = -1 } })
     TriggerClientEvent('tmg-phone:client:UpdateMails', src, mails or {})
-    
-    
-    
 end)
-
 
 RegisterNetEvent('tmg-phone:server:sendNewMail', function(mailData)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not mailData then return end
-
     local cid = Player.PlayerData.citizenid
 
     local mailDocument = {
@@ -861,26 +680,18 @@ RegisterNetEvent('tmg-phone:server:sendNewMail', function(mailData)
         message = mailData.message or "",
         mailid = GenerateMailId(),
         read = 0,
-        date = os.time() * 1000, 
-        button = mailData.button 
+        date = os.time() * 1000,
+        button = mailData.button
     }
-
     exports['tmgnosql']:SaveToCollection('player_mails', mailDocument)
-
     TriggerClientEvent('tmg-phone:client:NewMailNotify', src, mailData)
 
-    local updatedMails = exports['tmgnosql']:Find('player_mails', 
-        { citizenid = cid }, 
-        { sort = { date = -1 } }
-    )
-
+    local updatedMails = exports['tmgnosql']:Find('player_mails', { citizenid = cid }, { sort = { date = -1 } })
     TriggerClientEvent('tmg-phone:client:UpdateMails', src, updatedMails or {})
 end)
 
-
 RegisterNetEvent('tmg-phone:server:sendNewEventMail', function(citizenid, mailData)
     if not citizenid or not mailData then return end
-
     local mailDocument = {
         citizenid = citizenid,
         sender = mailData.sender or "System",
@@ -888,202 +699,137 @@ RegisterNetEvent('tmg-phone:server:sendNewEventMail', function(citizenid, mailDa
         message = mailData.message or "",
         mailid = GenerateMailId(),
         read = 0,
-        date = os.time() * 1000, 
-        button = mailData.button 
+        date = os.time() * 1000,
+        button = mailData.button
     }
-
     exports['tmgnosql']:SaveToCollection('player_mails', mailDocument)
-
     local Player = TMGCore.Functions.GetPlayerByCitizenId(citizenid)
-    
     if Player then
         local src = Player.PlayerData.source
-
-        local updatedMails = exports['tmgnosql']:Find('player_mails', 
-            { citizenid = citizenid }, 
-            { sort = { date = -1 } }
-        )
-
+        local updatedMails = exports['tmgnosql']:Find('player_mails', { citizenid = citizenid }, { sort = { date = -1 } })
         TriggerClientEvent('tmg-phone:client:UpdateMails', src, updatedMails or {})
         TriggerClientEvent('tmg-phone:client:NewMailNotify', src, mailData)
-    else
-        
-        print("^5[TMG]^7 Event mail queued for offline Citizen: " .. citizenid)
     end
 end)
-
 
 RegisterNetEvent('tmg-phone:server:ClearButtonData', function(mailId)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not mailId then return end
-
     local cid = Player.PlayerData.citizenid
-
     exports['tmgnosql']:UpdateOne('player_mails', 
         { mailid = mailId, citizenid = cid }, 
         { ["$set"] = { button = nil } }
     )
-
-    local updatedMails = exports['tmgnosql']:Find('player_mails', 
-        { citizenid = cid }, 
-        { sort = { date = -1 } }
-    )
-
+    local updatedMails = exports['tmgnosql']:Find('player_mails', { citizenid = cid }, { sort = { date = -1 } })
     TriggerClientEvent('tmg-phone:client:UpdateMails', src, updatedMails or {})
-    
-    print("^5[TMG]^7 Cleared for Mail: " .. mailId)
 end)
-
 
 RegisterNetEvent('tmg-phone:server:MentionedPlayer', function(firstName, lastName, TweetMessage)
     local targetCID = nil
     local targetSrc = nil
-
     for _, v in pairs(TMGCore.Functions.GetPlayers()) do
         local Player = TMGCore.Functions.GetPlayer(v)
         if Player and Player.PlayerData.charinfo.firstname == firstName and Player.PlayerData.charinfo.lastname == lastName then
             targetCID = Player.PlayerData.citizenid
             targetSrc = v
-            break 
+            break
         end
     end
-
     if not targetCID then
         local result = exports['tmgnosql']:FindOne('players', { 
             ["charinfo.firstname"] = firstName, 
             ["charinfo.lastname"] = lastName 
         }, { projection = { citizenid = 1 } })
-
-        if result then
-            targetCID = result.citizenid
-        end
+        if result then targetCID = result.citizenid end
     end
-
     if targetCID then
-        QBPhone.SetPhoneAlerts(targetCID, 'twitter')
-        QBPhone.AddMentionedTweet(targetCID, TweetMessage)
-
+        TMGPhone.SetPhoneAlerts(targetCID, 'twitter')
+        TMGPhone.AddMentionedTweet(targetCID, TweetMessage)
         if targetSrc then
-            TriggerClientEvent('tmg-phone:client:GetMentioned', targetSrc, TweetMessage, AppAlerts[targetCID]['twitter'])
+            TriggerClientEvent('tmg-phone:client:GetMentioned', targetSrc, TweetMessage, AppAlerts[targetCID] and AppAlerts[targetCID]['twitter'] or 0)
         end
     end
 end)
-
 
 RegisterNetEvent('tmg-phone:server:CallContact', function(TargetData, CallId, AnonymousCall)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not TargetData or not TargetData.number then return end
-
     local Target = TMGCore.Functions.GetPlayerByPhone(TargetData.number)
-    
+
     if Target then
         local TargetSrc = Target.PlayerData.source
-        
-        local CallerID = Player.PlayerData.charinfo.phone
-        if AnonymousCall then
-            CallerID = "Unknown" 
-        end
-
+        local CallerID = AnonymousCall and "Unknown" or Player.PlayerData.charinfo.phone
         TriggerClientEvent('tmg-phone:client:GetCalled', TargetSrc, CallerID, CallId, AnonymousCall)
-        
-        print(string.format("^5[TMG]^7 Call Handshake: %s -> %s (ID: %s)", Player.PlayerData.citizenid, Target.PlayerData.citizenid, CallId))
     else
-        
         TriggerClientEvent('tmg-phone:client:CallContactError', src)
     end
 end)
-
 
 RegisterNetEvent('tmg-phone:server:BillingEmail', function(data, paid)
     local src = source
     local Sender = TMGCore.Functions.GetPlayer(src)
     if not Sender or not data or not data.society then return end
-
     local senderName = string.format("%s %s", Sender.PlayerData.charinfo.firstname, Sender.PlayerData.charinfo.lastname)
-
-    local allPlayers = TMGCore.Functions.GetPlayers()
-    for _, targetSrc in pairs(allPlayers) do
+    
+    for _, targetSrc in pairs(TMGCore.Functions.GetPlayers()) do
         local TargetPly = TMGCore.Functions.GetPlayer(targetSrc)
-        
-        if TargetPly and TargetPly.PlayerData.job.name == data.society then
+        if TargetPly and TargetPly.PlayerData.job and TargetPly.PlayerData.job.name == data.society then
             TriggerClientEvent('tmg-phone:client:BillingEmail', targetSrc, data, paid, senderName)
         end
     end
-
-    print(string.format("^5[TMG]^7 %s notification sent to %s sector.", paid and "Payment" or "Invoice", data.society))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:UpdateHashtags', function(Handle, messageData)
     if not Handle or not messageData then return end
-
     Hashtags[Handle] = Hashtags[Handle] or { hashtag = Handle, messages = {} }
-    
     Hashtags[Handle].messages[#Hashtags[Handle].messages + 1] = messageData
 
     exports['tmgnosql']:UpdateOne('phone_hashtags', 
         { hashtag = Handle }, 
         { 
             ["$set"] = { hashtag = Handle },
-            ["$push"] = { messages = messageData } 
+            ["$push"] = { messages = messageData }
         }, 
         { upsert = true }
     )
-
     TriggerClientEvent('tmg-phone:client:UpdateHashtags', -1, Handle, messageData)
-    
-    print("^5[TMG]^7 Hashtag #"..Handle.." indexed and broadcasted.")
 end)
-
 
 RegisterNetEvent('tmg-phone:server:SetPhoneAlerts', function(app, alerts)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not app then return end
-
     local cid = Player.PlayerData.citizenid
 
     AppAlerts[cid] = AppAlerts[cid] or {}
     AppAlerts[cid][app] = alerts
-
-    local phonedata = Player.PlayerData.metadata['phonedata'] or {}
+    local phonedata = Player.PlayerData.metadata['phonedata'] or Player.PlayerData.metadata['phone'] or {}
     phonedata.Alerts = AppAlerts[cid]
-    
+
     Player.Functions.SetMetaData('phonedata', phonedata)
-
     TriggerClientEvent('tmg-phone:client:SetPhoneAlerts', src, app, alerts)
-    
-    print(string.format("^5[TMG]^7 Alert state updated for %s: %s (%s)", cid, app, alerts))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:DeleteTweet', function(tweetId)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not tweetId then return end
-
     local cid = Player.PlayerData.citizenid
 
     local deletedCount = exports['tmgnosql']:DeleteOne('phone_tweets', { 
         tweetId = tweetId, 
         citizenid = cid 
     })
-
     if deletedCount > 0 then
         for i = #TWData, 1, -1 do
             if TWData[i].tweetId == tweetId then
                 table.remove(TWData, i)
-                break 
+                break
             end
         end
-
         TriggerClientEvent('tmg-phone:client:UpdateTweets', -1, TWData, nil, true)
-        
-        print(string.format("^5[TMG]^7 Tweet %s purged by %s", tweetId, cid))
-    else
-        print("^1[TMG]^7 Unauthorized tweet deletion attempt by " .. cid)
     end
 end)
 
@@ -1097,58 +843,44 @@ RegisterNetEvent('tmg-phone:server:UpdateTweets', function(_, TweetData)
         citizenid = Player.PlayerData.citizenid,
         firstName = Player.PlayerData.charinfo.firstname,
         lastName = Player.PlayerData.charinfo.lastname,
-        message = TweetData.message:gsub('[%<>\"()]', ''), 
+        message = TweetData.message:gsub('[%<>\"()]', ''),
         date = os.time() * 1000,
         url = TweetData.url and TweetData.url:gsub('[%<>\"()\' $]', '') or "",
         picture = TweetData.picture and TweetData.picture:gsub('[%<>\"()\' $]', '') or "",
         tweetId = tweetId
     }
 
-    table.insert(TWData, 1, cleanTweet) 
-    
+    table.insert(TWData, 1, cleanTweet)
     if #TWData > 100 then table.remove(TWData) end
-
     exports['tmgnosql']:SaveToCollection('phone_tweets', cleanTweet)
-
     TriggerClientEvent('tmg-phone:client:UpdateTweets', -1, TWData, cleanTweet, false)
-    
-    print(string.format("^5[TMG]^7 Global Tweet Published: %s", tweetId))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:TransferMoney', function(iban, amount)
     local src = source
     local Sender = TMGCore.Functions.GetPlayer(src)
     if not Sender or not iban or not amount then return end
-
     local transferAmount = tonumber(amount) or 0
     if transferAmount <= 0 then 
-        TriggerClientEvent('TMGCore:Notify', src, "Invalid Amount", "error")
-        return 
+        return TriggerClientEvent('TMGCore:Notify', src, "Invalid Amount", "error")
     end
 
     if Sender.PlayerData.money.bank < transferAmount then
-        TriggerClientEvent('TMGCore:Notify', src, "Insufficient Bank Reserves", "error")
-        return
+        return TriggerClientEvent('TMGCore:Notify', src, "Insufficient Bank Reserves", "error")
     end
 
     local targetData = exports['tmgnosql']:FindOne('players', 
         { ["charinfo.account"] = iban }, 
         { projection = { citizenid = 1, money = 1 } }
     )
-
     if not targetData then
-        TriggerClientEvent('TMGCore:Notify', src, "Mainframe: IBAN Not Found", "error")
-        return
+        return TriggerClientEvent('TMGCore:Notify', src, "Mainframe: IBAN Not Found", "error")
     end
 
     if Sender.Functions.RemoveMoney('bank', transferAmount, "phone-transfer-to-" .. targetData.citizenid) then
-        
         local Receiver = TMGCore.Functions.GetPlayerByCitizenId(targetData.citizenid)
-
         if Receiver then
             Receiver.Functions.AddMoney('bank', transferAmount, "phone-transfer-from-" .. Sender.PlayerData.citizenid)
-            
             if Receiver.Functions.GetItemByName('phone') then
                 TriggerClientEvent('tmg-phone:client:TransferMoney', Receiver.PlayerData.source, transferAmount, Receiver.PlayerData.money.bank)
             end
@@ -1158,24 +890,21 @@ RegisterNetEvent('tmg-phone:server:TransferMoney', function(iban, amount)
                 { ["$inc"] = { ["money.bank"] = transferAmount } }
             )
         end
-
         TriggerClientEvent('TMGCore:Notify', src, "Transfer Successful: $" .. transferAmount, "success")
     else
         TriggerClientEvent('TMGCore:Notify', src, "Transfer Failed: Bank Error", "error")
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:server:EditContact', function(newName, newNumber, newIban, oldName, oldNumber)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return end
-
     local cid = Player.PlayerData.citizenid
 
     local cleanName = newName:gsub('[%<>\"()]', '')
-    local cleanNumber = newNumber:gsub('%s+', '') 
-    local cleanIban = newIban:upper():gsub('%s+', '') 
+    local cleanNumber = newNumber:gsub('%s+', '')
+    local cleanIban = newIban:upper():gsub('%s+', '')
 
     local success = exports['tmgnosql']:UpdateOne('player_contacts', 
         { 
@@ -1191,7 +920,6 @@ RegisterNetEvent('tmg-phone:server:EditContact', function(newName, newNumber, ne
             } 
         }
     )
-
     if success then
         TriggerClientEvent('tmg-phone:client:RefreshContacts', src)
     else
@@ -1199,12 +927,10 @@ RegisterNetEvent('tmg-phone:server:EditContact', function(newName, newNumber, ne
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:server:RemoveContact', function(Name, Number)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return end
-
     local cid = Player.PlayerData.citizenid
 
     local success = exports['tmgnosql']:DeleteOne('player_contacts', { 
@@ -1212,25 +938,19 @@ RegisterNetEvent('tmg-phone:server:RemoveContact', function(Name, Number)
         number = Number, 
         citizenid = cid 
     })
-
     if success then
         TriggerClientEvent('tmg-phone:client:RefreshContacts', src)
-        
-    else
-        print(string.format("^1[TMG ERROR]^7 Failed to purge contact for %s (Name: %s)", cid, Name))
     end
 end)
-
 
 RegisterNetEvent('tmg-phone:server:AddNewContact', function(name, number, iban)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return end
-
     local cid = Player.PlayerData.citizenid
 
     local cleanName = name:gsub('[%<>\"()]', '')
-    local cleanNumber = number:gsub('%s+', '') 
+    local cleanNumber = number:gsub('%s+', '')
     local cleanIban = iban and iban:upper():gsub('%s+', '') or ""
 
     local contactDocument = {
@@ -1239,20 +959,14 @@ RegisterNetEvent('tmg-phone:server:AddNewContact', function(name, number, iban)
         number = cleanNumber,
         iban = cleanIban
     }
-
     exports['tmgnosql']:SaveToCollection('player_contacts', contactDocument)
-
     TriggerClientEvent('tmg-phone:client:RefreshContacts', src)
-    
-    print(string.format("^5[TMG Mainframe]^7 New contact indexed for %s: %s", cid, cleanName))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:UpdateMessages', function(ChatMessages, ChatNumber)
     local src = source
     local Sender = TMGCore.Functions.GetPlayer(src)
     if not Sender or not ChatNumber then return end
-
     local senderCID = Sender.PlayerData.citizenid
     local senderPhone = Sender.PlayerData.charinfo.phone
 
@@ -1261,16 +975,13 @@ RegisterNetEvent('tmg-phone:server:UpdateMessages', function(ChatMessages, ChatN
         { projection = { citizenid = 1 } }
     )
     if not TargetResult then return end
-
     local targetCID = TargetResult.citizenid
 
     local updatePayload = { ["$set"] = { messages = ChatMessages } }
-
     exports['tmgnosql']:UpdateOne('phone_messages', 
         { citizenid = senderCID, number = ChatNumber }, 
         updatePayload, { upsert = true }
     )
-
     exports['tmgnosql']:UpdateOne('phone_messages', 
         { citizenid = targetCID, number = senderPhone }, 
         updatePayload, { upsert = true }
@@ -1282,35 +993,31 @@ RegisterNetEvent('tmg-phone:server:UpdateMessages', function(ChatMessages, ChatN
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:server:AddRecentCall', function(callType, data)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not data or not data.number then return end
-
     local cid = Player.PlayerData.citizenid
-    local timestamp = os.time() * 1000 
+    local timestamp = os.time() * 1000
 
     local senderEntry = {
         name = data.name or "Unknown",
         number = data.number,
         anonymous = data.anonymous,
-        type = callType, 
+        type = callType,
         time = timestamp
     }
 
-    local Target = TMGCore.Functions.GetPlayerByPhone(data.number)
-    
     local function logCall(targetCID, entry)
         exports['tmgnosql']:UpdateOne('phone_recent', 
             { citizenid = targetCID }, 
             { 
                 ["$push"] = { 
-                    calls = {
-                        ["$each"] = { entry },
-                        ["$sort"] = { time = -1 },
+                    calls = { 
+                        ["$each"] = { entry }, 
+                        ["$sort"] = { time = -1 }, 
                         ["$slice"] = 30 
-                    }
+                    } 
                 } 
             }, 
             { upsert = true }
@@ -1320,9 +1027,9 @@ RegisterNetEvent('tmg-phone:server:AddRecentCall', function(callType, data)
     logCall(cid, senderEntry)
     TriggerClientEvent('tmg-phone:client:AddRecentCall', src, senderEntry)
 
+    local Target = TMGCore.Functions.GetPlayerByPhone(data.number)
     if Target then
         local targetCID = Target.PlayerData.citizenid
-        
         local receiverEntry = {
             name = data.anonymous and "Unknown" or (Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname),
             number = data.anonymous and "Unknown" or Player.PlayerData.charinfo.phone,
@@ -1330,117 +1037,83 @@ RegisterNetEvent('tmg-phone:server:AddRecentCall', function(callType, data)
             type = 'incoming',
             time = timestamp
         }
-
         logCall(targetCID, receiverEntry)
         TriggerClientEvent('tmg-phone:client:AddRecentCall', Target.PlayerData.source, receiverEntry)
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:server:CancelCall', function(ContactData)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not ContactData or not ContactData.TargetData then return end
-
     local senderCID = Player.PlayerData.citizenid
     local targetNumber = ContactData.TargetData.number
-
     local TargetPly = TMGCore.Functions.GetPlayerByPhone(targetNumber)
-    
-    if Calls[senderCID] then
-        Calls[senderCID].inCall = false
-    end
 
+    if Calls[senderCID] then Calls[senderCID].inCall = false end
     if TargetPly then
         local targetCID = TargetPly.PlayerData.citizenid
-        local targetSrc = TargetPly.PlayerData.source
-
-        if Calls[targetCID] then
-            Calls[targetCID].inCall = false
-        end
-
-        TriggerClientEvent('tmg-phone:client:CancelCall', targetSrc)
-        
-        print(string.format("^5[TMG]^7 Call Terminated: %s <-> %s", senderCID, targetCID))
+        if Calls[targetCID] then Calls[targetCID].inCall = false end
+        TriggerClientEvent('tmg-phone:client:CancelCall', TargetPly.PlayerData.source)
     end
 end)
-
 
 RegisterNetEvent('tmg-phone:server:AnswerCall', function(CallData)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not CallData or not CallData.TargetData then return end
-
     local senderCID = Player.PlayerData.citizenid
     local targetNumber = CallData.TargetData.number
-
     local TargetPly = TMGCore.Functions.GetPlayerByPhone(targetNumber)
-    
+
     Calls[senderCID] = Calls[senderCID] or {}
     Calls[senderCID].inCall = true
 
     if TargetPly then
         local targetCID = TargetPly.PlayerData.citizenid
-        local targetSrc = TargetPly.PlayerData.source
-
         Calls[targetCID] = Calls[targetCID] or {}
         Calls[targetCID].inCall = true
-
-        TriggerClientEvent('tmg-phone:client:AnswerCall', targetSrc)
-        
-        print(string.format("^5[TMG Mainframe]^7 Voice Bridge Active: %s <-> %s", senderCID, targetCID))
+        TriggerClientEvent('tmg-phone:client:AnswerCall', TargetPly.PlayerData.source)
     else
         Calls[senderCID].inCall = false
         TriggerClientEvent('TMGCore:Notify', src, "Signal Lost: Caller Disconnected", "error")
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:server:SaveMetaData', function(MData)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not MData then return end
-
     local cid = Player.PlayerData.citizenid
 
     exports['tmgnosql']:UpdateOne('players', 
         { citizenid = cid }, 
-        { ["$set"] = { ["metadata.phone"] = MData } }
+        { ["$set"] = { ["metadata.phone"] = MData, ["metadata.phonedata"] = MData } }
     )
-
     Player.Functions.SetMetaData('phone', MData)
-
-    print("^5[TMG]^7 Metadata 'phone' state synced for Citizen: " .. cid)
+    Player.Functions.SetMetaData('phonedata', MData)
 end)
-
 
 RegisterNetEvent('tmg-phone:server:GiveContactDetails', function(targetId)
     local src = source
     local Sender = TMGCore.Functions.GetPlayer(src)
-    
     local Target = TMGCore.Functions.GetPlayer(tonumber(targetId))
-    
+
     if not Sender or not Target then 
-        TriggerClientEvent('TMGCore:Notify', src, "Mainframe: Target not found.", "error")
-        return 
+        return TriggerClientEvent('TMGCore:Notify', src, "Mainframe: Target not found.", "error") 
     end
 
     local SuggestionData = {
         name = {
-            firstName = Sender.PlayerData.charinfo.firstname,
-            lastName = Sender.PlayerData.charinfo.lastname
+            Sender.PlayerData.charinfo.firstname,
+            Sender.PlayerData.charinfo.lastname
         },
         number = Sender.PlayerData.charinfo.phone,
         bank = Sender.PlayerData.charinfo.account
     }
-
     TriggerClientEvent('tmg-phone:client:AddNewSuggestion', Target.PlayerData.source, SuggestionData)
-
     TriggerClientEvent('TMGCore:Notify', src, "Contact details shared with " .. Target.PlayerData.charinfo.firstname, "success")
-    
-    print(string.format("^5[TMG]^7 Contact Swap: %s -> %s", Sender.PlayerData.citizenid, Target.PlayerData.citizenid))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:AddTransaction', function(data)
     local src = source
@@ -1453,56 +1126,39 @@ RegisterNetEvent('tmg-phone:server:AddTransaction', function(data)
         message = data.TransactionMessage or "No details provided",
         time = os.time() * 1000
     }
-
     exports['tmgnosql']:SaveToCollection('phone_crypto_ledger', transactionDocument)
-    
-    print(string.format("^5[TMG]^7 Crypto Ledger Updated: %s (%s)", Player.PlayerData.citizenid, transactionDocument.title))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:InstallApplication', function(ApplicationData)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not ApplicationData or not ApplicationData.app then return end
-
     local cid = Player.PlayerData.citizenid
     local appName = ApplicationData.app
 
-    Player.PlayerData.metadata['phonedata'] = Player.PlayerData.metadata['phonedata'] or { InstalledApps = {} }
-    Player.PlayerData.metadata['phonedata'].InstalledApps[appName] = ApplicationData
+    local phoneMeta = Player.PlayerData.metadata['phonedata'] or Player.PlayerData.metadata['phone'] or { InstalledApps = {} }
+    phoneMeta.InstalledApps = phoneMeta.InstalledApps or {}
+    phoneMeta.InstalledApps[appName] = ApplicationData
 
     exports['tmgnosql']:UpdateOne('players', 
         { citizenid = cid }, 
-        { ["$set"] = { ["metadata.phonedata.InstalledApps." .. appName] = ApplicationData } }
+        { ["$set"] = { ["metadata.phonedata.InstalledApps." .. appName] = ApplicationData, ["metadata.phone.InstalledApps." .. appName] = ApplicationData } }
     )
-
     TriggerClientEvent('tmg-phone:client:RefreshPhone', src)
-    
-    print(string.format("^5[TMG]^7 App '%s' provisioned for Citizen: %s", appName, cid))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:RemoveInstallation', function(App)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not App then return end
-
     local cid = Player.PlayerData.citizenid
-
-    if Player.PlayerData.metadata['phonedata'] and Player.PlayerData.metadata['phonedata'].InstalledApps then
-        Player.PlayerData.metadata['phonedata'].InstalledApps[App] = nil
-    end
 
     exports['tmgnosql']:UpdateOne('players', 
         { citizenid = cid }, 
-        { ["$unset"] = { ["metadata.phonedata.InstalledApps." .. App] = "" } }
+        { ["$unset"] = { ["metadata.phonedata.InstalledApps." .. App] = "", ["metadata.phone.InstalledApps." .. App] = "" } }
     )
-
     TriggerClientEvent('tmg-phone:client:RefreshPhone', src)
-    
-    print(string.format("^5[TMG]^7 App '%s' de-provisioned for Citizen: %s", App, cid))
 end)
-
 
 RegisterNetEvent('tmg-phone:server:addImageToGallery', function(image)
     local src = source
@@ -1512,55 +1168,29 @@ RegisterNetEvent('tmg-phone:server:addImageToGallery', function(image)
     local mediaDocument = {
         citizenid = Player.PlayerData.citizenid,
         image = image,
-        date = os.time() * 1000 
+        date = os.time() * 1000
     }
-
     exports['tmgnosql']:SaveToCollection('phone_gallery', mediaDocument)
-    
-    print("^5[TMG]^7 Image archived for Citizen: " .. Player.PlayerData.citizenid)
 end)
-
 
 RegisterNetEvent('tmg-phone:server:getImageFromGallery', function()
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player then return end
-
     local cid = Player.PlayerData.citizenid
 
-    local images = exports['tmgnosql']:Find('phone_gallery', 
-        { citizenid = cid }, 
-        { sort = { date = -1 } }
-    )
-
+    local images = exports['tmgnosql']:Find('phone_gallery', { citizenid = cid }, { sort = { date = -1 } })
     TriggerClientEvent('tmg-phone:refreshImages', src, images or {})
-    
-    print("^5[TMG Mainframe]^7 Gallery stream completed for Citizen: " .. cid)
 end)
-
 
 RegisterNetEvent('tmg-phone:server:RemoveImageFromGallery', function(data)
     local src = source
     local Player = TMGCore.Functions.GetPlayer(src)
     if not Player or not data or not data.image then return end
-
     local cid = Player.PlayerData.citizenid
-    local imagePath = data.image
 
-    local deletedCount = exports['tmgnosql']:DeleteOne('phone_gallery', { 
-        image = imagePath, 
-        citizenid = cid 
-    })
-
-    if deletedCount > 0 then
-        print(string.format("^5[TMG]^7 Media purged for %s: %s", cid, imagePath))
-        
-        
-    else
-        print("^1[TMG WARNING]^7 Unauthorized or failed media purge attempt by " .. cid)
-    end
+    exports['tmgnosql']:DeleteOne('phone_gallery', { image = data.image, citizenid = cid })
 end)
-
 
 RegisterNetEvent('tmg-phone:server:sendPing', function(targetId)
     local src = source
@@ -1568,13 +1198,10 @@ RegisterNetEvent('tmg-phone:server:sendPing', function(targetId)
     local Target = TMGCore.Functions.GetPlayer(tonumber(targetId))
 
     if src == tonumber(targetId) then
-        TriggerClientEvent('TMGCore:Notify', src, "Mainframe: You cannot ping your own terminal.", "error")
-        return
+        return TriggerClientEvent('TMGCore:Notify', src, "Mainframe: You cannot ping your own terminal.", "error")
     end
-
     if not Target then
-        TriggerClientEvent('TMGCore:Notify', src, "Target terminal offline or unreachable.", "error")
-        return
+        return TriggerClientEvent('TMGCore:Notify', src, "Target terminal offline or unreachable.", "error")
     end
 
     local senderData = {
@@ -1582,16 +1209,9 @@ RegisterNetEvent('tmg-phone:server:sendPing', function(targetId)
         name = Player.PlayerData.charinfo.firstname .. " " .. Player.PlayerData.charinfo.lastname,
         phone = Player.PlayerData.charinfo.phone
     }
-
     TriggerClientEvent('tmg-phone:client:ReceivePing', Target.PlayerData.source, senderData)
-
     TriggerClientEvent('TMGCore:Notify', src, "GPS Signal beamed to " .. Target.PlayerData.charinfo.firstname, "success")
-    
-    print(string.format("^5[TMG]^7 Ping Handshake Initiated: %s -> %s", src, targetId))
 end)
-
-
-
 
 TMGCore.Commands.Add('setmetadata', 'Set Player Metadata (God Only)', {
     {name = 'id', help = 'Player ID'}, 
@@ -1603,11 +1223,10 @@ TMGCore.Commands.Add('setmetadata', 'Set Player Metadata (God Only)', {
     local metaType = tostring(args[2])
     local metaKey = tostring(args[3])
     local newValue = tonumber(args[4])
-
     local Target = TMGCore.Functions.GetPlayer(targetId)
+
     if not Target then
-        TriggerClientEvent('TMGCore:Notify', source, "Mainframe: Target terminal not found.", "error")
-        return
+        return TriggerClientEvent('TMGCore:Notify', source, "Mainframe: Target terminal not found.", "error")
     end
 
     local bsonPath = string.format("metadata.%s.%s", metaType, metaKey)
@@ -1621,12 +1240,8 @@ TMGCore.Commands.Add('setmetadata', 'Set Player Metadata (God Only)', {
     local currentMeta = Target.PlayerData.metadata[metaType] or {}
     currentMeta[metaKey] = newValue
     Target.Functions.SetMetaData(metaType, currentMeta)
-
     TriggerClientEvent('TMGCore:Notify', source, string.format("Update: %s.%s set to %s for ID %s", metaType, metaKey, newValue, targetId), "success")
-    print(string.format("^5[TMG]^7 Admin %s modified %s for %s", source, bsonPath, cid))
-
 end, 'god')
-
 
 TMGCore.Commands.Add('bill', 'Bill A Player', { 
     { name = 'id', help = 'Player ID' }, 
@@ -1636,27 +1251,19 @@ TMGCore.Commands.Add('bill', 'Bill A Player', {
     local Biller = TMGCore.Functions.GetPlayer(src)
     local Billed = TMGCore.Functions.GetPlayer(tonumber(args[1]))
     local amount = tonumber(args[2])
-
     local authorizedJobs = { ['police'] = true, ['ambulance'] = true, ['mechanic'] = true }
-    
-    if not authorizedJobs[Biller.PlayerData.job.name] then
-        TriggerClientEvent('TMGCore:Notify', src, "Mainframe: Unauthorized access to billing protocols.", "error")
-        return
-    end
 
+    if not Biller or not authorizedJobs[Biller.PlayerData.job.name] then
+        return TriggerClientEvent('TMGCore:Notify', src, "Mainframe: Unauthorized access to billing protocols.", "error")
+    end
     if not Billed then
-        TriggerClientEvent('TMGCore:Notify', src, "Target terminal offline.", "error")
-        return
+        return TriggerClientEvent('TMGCore:Notify', src, "Target terminal offline.", "error")
     end
-
     if Biller.PlayerData.citizenid == Billed.PlayerData.citizenid then
-        TriggerClientEvent('TMGCore:Notify', src, "System Error: Cannot bill self-entity.", "error")
-        return
+        return TriggerClientEvent('TMGCore:Notify', src, "System Error: Cannot bill self-entity.", "error")
     end
-
     if not amount or amount <= 0 then
-        TriggerClientEvent('TMGCore:Notify', src, "Invalid Amount: Must be above 0.", "error")
-        return
+        return TriggerClientEvent('TMGCore:Notify', src, "Invalid Amount: Must be above 0.", "error")
     end
 
     local invoiceId = "INV-" .. math.random(1111, 9999) .. os.time()
@@ -1668,14 +1275,10 @@ TMGCore.Commands.Add('bill', 'Bill A Player', {
         sender = Biller.PlayerData.charinfo.firstname .. " " .. Biller.PlayerData.charinfo.lastname,
         sendercitizenid = Biller.PlayerData.citizenid,
         status = "unpaid",
-        date = os.time() * 1000 
+        date = os.time() * 1000
     }
-
     exports['tmgnosql']:SaveToCollection('phone_invoices', invoiceDocument)
-
-    TriggerClientEvent('tmg-phone:client:RefreshInvoices', Billed.PlayerData.source) 
+    TriggerClientEvent('tmg-phone:client:RefreshInvoices', Billed.PlayerData.source)
     TriggerClientEvent('TMGCore:Notify', src, 'Invoice Beamed Successfully', 'success')
     TriggerClientEvent('TMGCore:Notify', Billed.PlayerData.source, 'New Invoice Received: $' .. amount)
-    
-    print(string.format("^5[TMG]^7 Invoice %s generated by %s for %s", invoiceId, Biller.PlayerData.citizenid, Billed.PlayerData.citizenid))
 end)

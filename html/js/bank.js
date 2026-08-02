@@ -6,7 +6,7 @@ $(document).on('click', '.bank-app-account', function(e){
     copyText.setSelectionRange(0, 99999);
     document.execCommand("copy");
 
-    QB.Phone.Notifications.Add("fas fa-university", "QBank", "Account number. copied!", "#badc58", 1750);
+    TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "Account number. copied!", "#badc58", 1750);
 });
 
 var CurrentTab = "accounts";
@@ -46,11 +46,11 @@ $(document).on('click', '.bank-app-header-button', function(e){
     }
 })
 
-QB.Phone.Functions.DoBankOpen = function() {
-    QB.Phone.Data.PlayerData.money.bank = (QB.Phone.Data.PlayerData.money.bank).toFixed();
-    $(".bank-app-account-number").val(QB.Phone.Data.PlayerData.charinfo.account);
-    $(".bank-app-account-balance").html("&#36; "+QB.Phone.Data.PlayerData.money.bank);
-    $(".bank-app-account-balance").data('balance', QB.Phone.Data.PlayerData.money.bank);
+TMG.Phone.Functions.DoBankOpen = function() {
+    TMG.Phone.Data.PlayerData.money.bank = (TMG.Phone.Data.PlayerData.money.bank).toFixed();
+    $(".bank-app-account-number").val(TMG.Phone.Data.PlayerData.charinfo.account);
+    $(".bank-app-account-balance").html("&#36; "+TMG.Phone.Data.PlayerData.money.bank);
+    $(".bank-app-account-balance").data('balance', TMG.Phone.Data.PlayerData.money.bank);
 
     $(".bank-app-loaded").css({"display":"none", "padding-left":"30vh"});
     $(".bank-app-accounts").css({"left":"30vh"});
@@ -84,13 +84,13 @@ QB.Phone.Functions.DoBankOpen = function() {
 }
 
 $(document).on('click', '.bank-app-account-actions', function(e){
-    QB.Phone.Animations.TopSlideDown(".bank-app-transfer", 400, 0);
+    TMG.Phone.Animations.TopSlideDown(".bank-app-transfer", 400, 0);
 });
 
 $(document).on('click', '#cancel-transfer', function(e){
     e.preventDefault();
 
-    QB.Phone.Animations.TopSlideUp(".bank-app-transfer", 400, -100);
+    TMG.Phone.Animations.TopSlideUp(".bank-app-transfer", 400, -100);
 });
 
 $(document).on('click', '#accept-transfer', function(e){
@@ -101,7 +101,7 @@ $(document).on('click', '#accept-transfer', function(e){
     var amountData = $(".bank-app-account-balance").data('balance');
 
     if (iban != "" && amount != "") {
-            $.post('https://qb-phone/CanTransferMoney', JSON.stringify({
+            $.post('https://tmg-phone/CanTransferMoney', JSON.stringify({
                 sendTo: iban,
                 amountOf: amount,
             }), function(data){
@@ -111,14 +111,14 @@ $(document).on('click', '#accept-transfer', function(e){
 
                     $(".bank-app-account-balance").html("&#36; " + (data.NewBalance).toFixed(0));
                     $(".bank-app-account-balance").data('balance', (data.NewBalance).toFixed(0));
-                    QB.Phone.Notifications.Add("fas fa-university", "QBank", "You have transfered &#36; "+amount+"!", "#badc58", 1500);
+                    TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "You have transfered &#36; "+amount+"!", "#badc58", 1500);
                 } else {
-                    QB.Phone.Notifications.Add("fas fa-university", "QBank", "You don't have enough balance!", "#badc58", 1500);
+                    TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "You don't have enough balance!", "#badc58", 1500);
                 }
-                QB.Phone.Animations.TopSlideUp(".bank-app-transfer", 400, -100);
+                TMG.Phone.Animations.TopSlideUp(".bank-app-transfer", 400, -100);
             });
     } else {
-        QB.Phone.Notifications.Add("fas fa-university", "QBank", "Fill out all fields!", "#badc58", 1750);
+        TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "Fill out all fields!", "#badc58", 1750);
     }
 });
 
@@ -139,7 +139,7 @@ $(document).on('click', '.pay-invoice', function(event){
     var BankBalance = $(".bank-app-account-balance").data('balance');
 
     if (BankBalance >= InvoiceData.amount) {
-        $.post('https://qb-phone/PayInvoice', JSON.stringify({
+        $.post('https://tmg-phone/PayInvoice', JSON.stringify({
             sender: InvoiceData.sender,
             amount: InvoiceData.amount,
             society: InvoiceData.society,
@@ -154,17 +154,17 @@ $(document).on('click', '.pay-invoice', function(event){
                         $("#"+InvoiceId).remove();
                     }, 100);
                 });
-                QB.Phone.Notifications.Add("fas fa-university", "QBank", "You have paid &#36;"+InvoiceData.amount+"!", "#badc58", 1500);
+                TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "You have paid &#36;"+InvoiceData.amount+"!", "#badc58", 1500);
                 var amountData = $(".bank-app-account-balance").data('balance');
                 var NewAmount = (amountData - InvoiceData.amount).toFixed();
                 $("#bank-transfer-amount").val(NewAmount);
                 $(".bank-app-account-balance").data('balance', NewAmount);
             } else {
-                QB.Phone.Notifications.Add("fas fa-university", "QBank", "You don't have enough balance!", "#badc58", 1500);
+                TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "You don't have enough balance!", "#badc58", 1500);
             }
         });
     } else {
-        QB.Phone.Notifications.Add("fas fa-university", "QBank", "You don't have enough balance!", "#badc58", 1500);
+        TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "You don't have enough balance!", "#badc58", 1500);
     }
 });
 
@@ -173,14 +173,14 @@ $(document).on('click', '.decline-invoice', async function(event) {
     var InvoiceId = $(this).parent().parent().parent().attr('id');
     var InvoiceData = $("#"+InvoiceId).data('invoicedata');
 
-    const resp = await $.post('https://qb-phone/DeclineInvoice', JSON.stringify({
+    const resp = await $.post('https://tmg-phone/DeclineInvoice', JSON.stringify({
         sender: InvoiceData.sender,
         amount: InvoiceData.amount,
         society: InvoiceData.society,
         invoiceId: InvoiceData.id,
     }));
     if(resp === true) {
-        QB.Phone.Notifications.Add("fas fa-university", "QBank", "You declined the invoice", "#8c7ae6")
+        TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "You declined the invoice", "#8c7ae6")
         $("#"+InvoiceId).animate({
             left: 30+"vh",
         }, 300, function(){
@@ -189,24 +189,30 @@ $(document).on('click', '.decline-invoice', async function(event) {
             }, 100);
         });
     } else {
-        QB.Phone.Notifications.Add("fas fa-university", "QBank", "Couldnt decline this invoice...", "#8c7ae6")
+        TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "Couldnt decline this invoice...", "#8c7ae6")
     }
 });
 
-QB.Phone.Functions.LoadBankInvoices = function(invoices) {
-    if (invoices !== null) {
+TMG.Phone.Functions.LoadBankInvoices = function(invoices) {
+    if (invoices !== null && invoices !== undefined) {
         $(".bank-app-invoices-list").html("");
-
-        $.each(invoices, function(i, invoice){
-            var Elem = '<div class="bank-app-invoice" id="invoiceid-'+invoice.id+'"> <div class="bank-app-invoice-title">'+invoice.society+' <span style="font-size: 1vh; color: gray;">(Sender: '+invoice.sender+')</span></div>' + (typeof invoice.reason === 'string' ? `<div class="bank-app-invoice-reason">${invoice.reason}</div>` : '') + '<div class="bank-app-invoice-info"><div class="bank-app-invoice-amount">&#36; '+invoice.amount+'</div> <div class="bank-app-invoice-buttons"> <i class="fas fa-check-circle pay-invoice"></i>'+ (invoice.candecline === 1 ? '<i class="fas fa-times-circle decline-invoice"></i>' : '') + '</div></div></div>';
-
+        $.each(invoices, function(i, invoice) {
+            var invId = invoice.invoiceId || invoice.id;
+            var senderCid = invoice.sendercitizenid || invoice.senderCitizenId || invoice.sender;
+            
+            var Elem = '<div class="bank-app-invoice" id="invoiceid-' + invId + '"> <div class="bank-app-invoice-title">' + invoice.society + ' <span style="font-size: 1vh; color: gray;">(Sender: ' + invoice.sender + ')</span></div>' + (typeof invoice.reason === 'string' ? `<div class="bank-app-invoice-reason">${invoice.reason}</div>` : '') + '<div class="bank-app-invoice-info"><div class="bank-app-invoice-amount">&#36; ' + invoice.amount + '</div> <div class="bank-app-invoice-buttons"> <i class="fas fa-check-circle pay-invoice"></i>' + (invoice.candecline === 1 ? '<i class="fas fa-times-circle decline-invoice"></i>' : '') + '</div></div></div>';
+            
             $(".bank-app-invoices-list").append(Elem);
-            $("#invoiceid-"+invoice.id).data('invoicedata', invoice);
+            
+            // Standardize object data key so PayInvoice/DeclineInvoice click handlers read the safe ID
+            invoice.invoiceId = invId;
+            invoice.senderCitizenId = senderCid;
+            $("#invoiceid-" + invId).data('invoicedata', invoice);
         });
     }
-}
+};
 
-QB.Phone.Functions.LoadContactsWithNumber = function(myContacts) {
+TMG.Phone.Functions.LoadContactsWithNumber = function(myContacts) {
     var ContactsObject = $(".bank-app-my-contacts-list");
     $(ContactsObject).html("");
     var TotalContacts = 0;
@@ -221,7 +227,7 @@ QB.Phone.Functions.LoadContactsWithNumber = function(myContacts) {
     if (myContacts !== null) {
         $.each(myContacts, function(i, contact){
             var RandomNumber = Math.floor(Math.random() * 6);
-            var ContactColor = QB.Phone.ContactColors[RandomNumber];
+            var ContactColor = TMG.Phone.ContactColors[RandomNumber];
             var ContactElement = '<div class="bank-app-my-contact" data-bankcontactid="'+i+'"> <div class="bank-app-my-contact-firstletter">'+((contact.name).charAt(0)).toUpperCase()+'</div> <div class="bank-app-my-contact-name">'+contact.name+'</div> </div>'
             TotalContacts = TotalContacts + 1
             $(ContactsObject).append(ContactElement);
@@ -233,13 +239,13 @@ QB.Phone.Functions.LoadContactsWithNumber = function(myContacts) {
 $(document).on('click', '.bank-app-my-contacts-list-back', function(e){
     e.preventDefault();
 
-    QB.Phone.Animations.TopSlideUp(".bank-app-my-contacts", 400, -100);
+    TMG.Phone.Animations.TopSlideUp(".bank-app-my-contacts", 400, -100);
 });
 
 $(document).on('click', '.bank-transfer-mycontacts-icon', function(e){
     e.preventDefault();
 
-    QB.Phone.Animations.TopSlideDown(".bank-app-my-contacts", 400, 0);
+    TMG.Phone.Animations.TopSlideDown(".bank-app-my-contacts", 400, 0);
 });
 
 $(document).on('click', '.bank-app-my-contact', function(e){
@@ -249,7 +255,7 @@ $(document).on('click', '.bank-app-my-contact', function(e){
     if (PressedContactData.iban !== "" && PressedContactData.iban !== undefined && PressedContactData.iban !== null) {
         $("#bank-transfer-iban").val(PressedContactData.iban);
     } else {
-        QB.Phone.Notifications.Add("fas fa-university", "QBank", "There is no bank account attached to this number!", "#badc58", 2500);
+        TMG.Phone.Notifications.Add("fas fa-university", "TMGank", "There is no bank account attached to this number!", "#badc58", 2500);
     }
-    QB.Phone.Animations.TopSlideUp(".bank-app-my-contacts", 400, -100);
+    TMG.Phone.Animations.TopSlideUp(".bank-app-my-contacts", 400, -100);
 });

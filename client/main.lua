@@ -29,7 +29,6 @@ local PhoneData = {
     Images = {},
 }
 
-
 function string:split(delimiter)
     local result = {}
     for match in (self .. delimiter):gmatch("(.-)" .. delimiter) do
@@ -49,17 +48,6 @@ local function escape_str(s)
     }
     return s:gsub('[<>&"\']', function(c) return htmlMap[c] end)
 end
-
-RegisterNUICallback('PostNewTweet', function(data, cb)
-    local hours = GetClockHours()
-    local minutes = GetClockMinutes()
-    
-    if minutes < 10 then 
-        minutes = "0" .. minutes 
-    end
-    
-    local tweetTime = hours .. ":" .. minutes
-end)
 
 local function IsNumberInContacts(num)
     for _, v in ipairs(PhoneData.Contacts) do
@@ -344,7 +332,6 @@ local function CancelCall()
     end
 end
 
-
 local function CallContact(CallData, AnonymousCall)
     PhoneData.CallData = {
         CallType = 'outgoing',
@@ -409,7 +396,6 @@ local function AnswerCall()
     if call.CallId and type(call.CallId) == "number" then
         exports['pma-voice']:addPlayerToCall(call.CallId)
     else
-        
         print("^3[TMG Warning]^7 Voice routing bypassed: CallId was null.")
     end
 
@@ -440,8 +426,6 @@ local function ToggleFrontCamera(activate)
     CellFrontCamActivate(state)
 end
 
-
-
 RegisterCommand('phone', function()
     if PhoneData.isOpen or not LocalPlayer.state.isLoggedIn or IsPauseMenuActive() then 
         return 
@@ -462,7 +446,7 @@ RegisterCommand('phone', function()
     OpenPhone()
 end)
 
-RegisterKeyMapping('phone', 'Open Phone', 'keyboard', Config.OpenPhone)
+RegisterKeyMapping('phone', 'Open Phone', 'keyboard', Config.OpenPhone or Config.OpenKey or 'M')
 
 local callActions = {
     ['CancelOutgoingCall'] = CancelCall,
@@ -498,7 +482,6 @@ RegisterNUICallback('ClearRecentAlerts', function(_, cb)
     cb('ok')
 end)
 
-
 RegisterNUICallback('SetBackground', function(data, cb)
     if type(data) ~= "table" or type(data.background) ~= "string" then
         print("^3[TMG Security]^7 Background sync aborted: Malformed payload detected.")
@@ -520,9 +503,9 @@ local stateRetrievals = {
     ['GetMissedCalls']       = function() return PhoneData.RecentCalls or {} end,
     ['GetSuggestedContacts'] = function() return PhoneData.SuggestedContacts or {} end,
     ['SetupGarageVehicles']  = function() return PhoneData.GarageVehicles or {} end,
-    ['GetGalleryData']       = function() 
-        return PhoneData.Images or {} 
-    end,
+    ['GetGalleryData']       = function() return PhoneData.Images or {} end,
+    ['GetMails']             = function() return PhoneData.Mails or {} end,
+    ['GetBankContacts']      = function() return PhoneData.Contacts or {} end,
     ['GetCryptoTransactions'] = function() 
         return {
             CryptoTransactions = PhoneData.CryptoTransactions or {}
@@ -531,14 +514,12 @@ local stateRetrievals = {
     ['GetActiveJob'] = function() 
         return PlayerJob.name or "unemployed" 
     end,
-
     ['GetBatteryLevel'] = function() 
         return PhoneData.MetaData.battery or 100 
     end,
-
     ['GetPlayerPing'] = function()
         local myId = GetPlayerServerId(PlayerId())
-        return myID
+        return myId
     end,
     ['LoadAdverts'] = function() 
         return PhoneData.Adverts or {} 
@@ -552,7 +533,6 @@ local stateRetrievals = {
     ['GetTweets'] = function() 
         return PhoneData.Tweets or {} 
     end
-
 }
 
 for actionName, getterFunction in pairs(stateRetrievals) do
@@ -664,7 +644,6 @@ RegisterNUICallback('GetProfilePicture', function(data, cb)
     end, data.number)
 end)
 
-
 RegisterNUICallback('GetInvoices', function(_, cb)
     TMGCore.Functions.TriggerCallback('tmg-phone:server:GetInvoices', function(resp)
         cb(type(resp) == "table" and resp or {})
@@ -676,13 +655,11 @@ RegisterNUICallback('SharedLocation', function(data, cb)
 
     local x, y = tonumber(data.coords.x), tonumber(data.coords.y)
     if not x or not y then 
-        print("^1[TMG Error]^7 GPS routing aborted: Coordinate index 3 (Z) or Axis was null.")
+        print("^1[TMG Error]^7 GPS routing aborted: Invalid coordinate matrix.")
         return cb('error') 
     end
 
-    if x and y then
-        SetNewWaypoint(x + 0.0, y + 0.0)
-    end
+    SetNewWaypoint(x + 0.0, y + 0.0)
     cb('ok')
 end)
 
@@ -732,7 +709,6 @@ RegisterNUICallback('ClearAlerts', function(data, cb)
     end
 
     local chatKey = GetKeyByNumber(data.number)
-    
     local chatMatrix = chatKey and PhoneData.Chats[chatKey] or nil
     local appConfig = Config.PhoneApplications['whatsapp']
 
@@ -767,7 +743,7 @@ RegisterNUICallback('PayInvoice', function(data, cb)
     local amount = tonumber(data.amount)
     local invoiceId = data.invoiceId
     local society = type(data.society) == "string" and data.society or nil
-    local senderCitizenId = type(data.senderCitizenId) == "string" and data.senderCitizenId or nil
+    local senderCitizenId = type(data.senderCitizenId) == "string" and data.senderCitizenId or data.sendercitizenid or nil
 
     if not amount or amount <= 0 or not invoiceId then
         print("^1[TMG Error]^7 Transaction failed: Invalid billing amount or Invoice ID.")
@@ -775,13 +751,10 @@ RegisterNUICallback('PayInvoice', function(data, cb)
     end
 
     TMGCore.Functions.TriggerCallback('tmg-phone:server:PayInvoice', function(paymentSuccess)
-        
         if paymentSuccess then
             TriggerServerEvent('tmg-phone:server:BillingEmail', data, true)
         end
-
         cb(paymentSuccess == true)
-        
     end, society, amount, invoiceId, senderCitizenId)
 end)
 
@@ -805,9 +778,9 @@ RegisterNUICallback('DeclineInvoice', function(data, cb)
             TriggerServerEvent('tmg-phone:server:BillingEmail', data, false)
         end
         cb(declineSuccess == true)
-        
     end, society, amount, invoiceId)
 end)
+
 RegisterNUICallback('EditContact', function(data, cb)
     if type(data) ~= "table" or type(data.CurrentContactName) ~= "string" or type(data.CurrentContactNumber) ~= "string" then
         print("^3[TMG Security]^7 Contact edit aborted: Malformed payload detected.")
@@ -973,7 +946,7 @@ end)
 local searchLock = false
 
 RegisterNUICallback('FetchSearchResults', function(data, cb)
-    if searchLock then
+    if searchLock then 
         return cb({}) 
     end
 
@@ -983,7 +956,6 @@ RegisterNUICallback('FetchSearchResults', function(data, cb)
     end
 
     local query = string.match(data.input, "^%s*(.-)%s*$")
-    
     if not query or query == "" then
         return cb({})
     end
@@ -1006,11 +978,6 @@ RegisterNUICallback('InstallApplication', function(data, cb)
         return cb(false)
     end
 
-    if not CanDownloadApps then
-        print("^3[TMG Info]^7 Installation blocked: App downloads are currently disabled.")
-        return cb(false)
-    end
-
     if type(data) ~= "table" or type(data.app) ~= "string" then
         print("^3[TMG Security]^7 Install aborted: Malformed UI payload.")
         return cb(false)
@@ -1022,28 +989,20 @@ RegisterNUICallback('InstallApplication', function(data, cb)
         return cb(false)
     end
 
-    local newSlot = GetFirstAvailableSlot()
-    local maxSlots = tonumber(Config.MaxSlots) or 20
+    installLock = true
 
-    if type(newSlot) == "number" and newSlot <= maxSlots then
-        
-        installLock = true
+    TriggerServerEvent('tmg-phone:server:InstallApplication', {
+        app = data.app,
+    })
 
-        TriggerServerEvent('tmg-phone:server:InstallApplication', {
-            app = data.app,
-        })
+    SetTimeout(2000, function()
+        installLock = false
+    end)
 
-        SetTimeout(2000, function()
-            installLock = false
-        end)
-
-        cb({
-            app = data.app,
-            data = appData
-        })
-    else
-        cb(false)
-    end
+    cb({
+        app = data.app,
+        data = appData
+    })
 end)
 
 local uninstallLock = false
@@ -1070,13 +1029,10 @@ RegisterNUICallback('RemoveApplication', function(data, cb)
     cb('ok')
 end)
 
-
 RegisterNUICallback('GetTruckerData', function(_, cb)
     local player = TMGCore.Functions.GetPlayerData()
-
     local metadata = type(player) == "table" and player.metadata or {}
     local jobrep = type(metadata.jobrep) == "table" and metadata.jobrep or {}
-    
     local truckerRep = tonumber(jobrep.trucker) or 0
 
     local success, tierData = pcall(function()
@@ -1086,10 +1042,6 @@ RegisterNUICallback('GetTruckerData', function(_, cb)
     if success and type(tierData) == "table" then
         cb(tierData)
     else
-        if not success then
-            print("^3[TMG Warning]^7 Trucker integration failed: 'tmg-trucker' resource is likely offline.")
-        end
-        
         cb({})
     end
 end)
@@ -1115,7 +1067,6 @@ RegisterNUICallback('DeleteImage', function(data, cb)
         for i, imgData in ipairs(PhoneData.Images) do
             local isMatch = (type(imgData) == "table" and imgData.image == targetImage) or 
                             (type(imgData) == "string" and imgData == targetImage)
-            
             if isMatch then
                 table.remove(PhoneData.Images, i)
                 break 
@@ -1132,13 +1083,10 @@ RegisterNUICallback('DeleteImage', function(data, cb)
     cb(PhoneData.Images or true)
 end)
 
-
 local trackVehicleLock = false
 
 RegisterNUICallback('track-vehicle', function(data, cb)
-    if trackVehicleLock then
-        return cb('error')
-    end
+    if trackVehicleLock then return cb('error') end
 
     if type(data) ~= "table" or type(data.veh) ~= "table" or type(data.veh.plate) ~= "string" then
         print("^3[TMG Security]^7 Tracking aborted: Malformed payload matrix.")
@@ -1146,10 +1094,7 @@ RegisterNUICallback('track-vehicle', function(data, cb)
     end
 
     local plate = string.upper(data.veh.plate)
-
-    if plate == "" then
-        return cb('error')
-    end
+    if plate == "" then return cb('error') end
 
     trackVehicleLock = true
 
@@ -1170,7 +1115,6 @@ local contactDeleteLock = false
 
 RegisterNUICallback('DeleteContact', function(data, cb)
     if contactDeleteLock then
-        print("^3[TMG Security]^7 Contact deletion blocked: Rate limit exceeded.")
         return cb(PhoneData.Contacts) 
     end
 
@@ -1188,7 +1132,6 @@ RegisterNUICallback('DeleteContact', function(data, cb)
         for i, contact in ipairs(PhoneData.Contacts) do
             if contact.name == targetName and contact.number == targetNumber then
                 table.remove(PhoneData.Contacts, i)
-                
                 SendNUIMessage({
                     action = 'PhoneNotification',
                     PhoneNotify = {
@@ -1199,7 +1142,6 @@ RegisterNUICallback('DeleteContact', function(data, cb)
                         timeout = 1500,
                     },
                 })
-                
                 break 
             end
         end
@@ -1222,9 +1164,7 @@ end)
 local cryptoSyncLock = false
 
 RegisterNUICallback('GetCryptoData', function(data, cb)
-    if cryptoSyncLock then
-        return cb({}) 
-    end
+    if cryptoSyncLock then return cb({}) end
 
     if type(data) ~= "table" or type(data.crypto) ~= "string" then
         print("^3[TMG Security]^7 Crypto sync aborted: Malformed payload detected.")
@@ -1232,17 +1172,12 @@ RegisterNUICallback('GetCryptoData', function(data, cb)
     end
 
     local cryptoIdentifier = string.lower(data.crypto)
-
-    if cryptoIdentifier == "" then
-        return cb({})
-    end
+    if cryptoIdentifier == "" then return cb({}) end
 
     cryptoSyncLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-crypto:server:GetCryptoData', function(marketData)
-        
         cb(type(marketData) == "table" and marketData or {})
-        
     end, cryptoIdentifier)
 
     SetTimeout(1500, function()
@@ -1298,9 +1233,7 @@ RegisterNUICallback('TransferCrypto', function(data, cb)
         return cb(false)
     end
     local walletId = string.match(data.walletid, "^%s*(.-)%s*$")
-    if walletId == "" then
-        return cb(false)
-    end
+    if walletId == "" then return cb(false) end
 
     cryptoTransactionLock = true
     local cleanPayload = { crypto = string.lower(data.crypto), coins = coins, walletid = walletId }
@@ -1314,16 +1247,12 @@ end)
 local raceSyncLock = false
 
 RegisterNUICallback('GetAvailableRaces', function(_, cb)
-    if raceSyncLock then
-        return cb({}) 
-    end
+    if raceSyncLock then return cb({}) end
 
     raceSyncLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-lapraces:server:GetRaces', function(races)
-        
         cb(type(races) == "table" and races or {})
-        
     end)
 
     SetTimeout(1500, function()
@@ -1332,6 +1261,7 @@ RegisterNUICallback('GetAvailableRaces', function(_, cb)
 end)
 
 local raceActionLock = false
+
 RegisterNUICallback('JoinRace', function(data, cb)
     if raceActionLock then return cb('error') end
 
@@ -1341,9 +1271,7 @@ RegisterNUICallback('JoinRace', function(data, cb)
     end
 
     raceActionLock = true
-    
     TriggerServerEvent('tmg-lapraces:server:JoinRace', data.RaceData)
-
     SetTimeout(1000, function() raceActionLock = false end)
     cb('ok')
 end)
@@ -1357,9 +1285,7 @@ RegisterNUICallback('LeaveRace', function(data, cb)
     end
 
     raceActionLock = true
-    
     TriggerServerEvent('tmg-lapraces:server:LeaveRace', data.RaceData)
-
     SetTimeout(1000, function() raceActionLock = false end)
     cb('ok')
 end)
@@ -1373,9 +1299,7 @@ RegisterNUICallback('StartRace', function(data, cb)
     end
 
     raceActionLock = true
-    
     TriggerServerEvent('tmg-lapraces:server:StartRace', data.RaceData.RaceId)
-
     SetTimeout(1500, function() raceActionLock = false end)
     cb('ok')
 end)
@@ -1383,9 +1307,7 @@ end)
 local waypointLock = false
 
 RegisterNUICallback('SetAlertWaypoint', function(data, cb)
-    if waypointLock then
-        return cb('error')
-    end
+    if waypointLock then return cb('error') end
 
     if type(data) ~= "table" or type(data.alert) ~= "table" or type(data.alert.coords) ~= "table" then
         print("^3[TMG Security]^7 GPS Routing aborted: Malformed payload matrix.")
@@ -1395,32 +1317,22 @@ RegisterNUICallback('SetAlertWaypoint', function(data, cb)
     local coords = data.alert.coords
     local destX = tonumber(coords.x)
     local destY = tonumber(coords.y)
-    
     local alertTitle = type(data.alert.title) == "string" and data.alert.title or "Unknown Alert"
 
-    if not destX or not destY then
-        print("^1[TMG Error]^7 GPS Routing failed: Invalid spatial coordinate data.")
-        return cb('error')
-    end
+    if not destX or not destY then return cb('error') end
 
     waypointLock = true
-
     SetNewWaypoint(destX, destY)
     TMGCore.Functions.Notify('GPS Protocol active: Routing to ' .. alertTitle, 'success')
 
-    SetTimeout(1000, function()
-        waypointLock = false
-    end)
-
+    SetTimeout(1000, function() waypointLock = false end)
     cb('ok')
 end)
 
 local suggestionDeleteLock = false
 
 RegisterNUICallback('RemoveSuggestion', function(payload, cb)
-    if suggestionDeleteLock then
-        return cb('error')
-    end
+    if suggestionDeleteLock then return cb('error') end
 
     if type(payload) ~= "table" or type(payload.data) ~= "table" then
         print("^3[TMG Security]^7 Suggestion rejection aborted: Malformed payload matrix.")
@@ -1430,7 +1342,6 @@ RegisterNUICallback('RemoveSuggestion', function(payload, cb)
     local targetData = payload.data
 
     if type(targetData.name) ~= "table" or type(targetData.number) ~= "string" then
-        print("^1[TMG Error]^7 Suggestion rejection failed: Invalid nested arrays or missing number.")
         return cb('error')
     end
 
@@ -1438,9 +1349,7 @@ RegisterNUICallback('RemoveSuggestion', function(payload, cb)
 
     if type(PhoneData.SuggestedContacts) == "table" then
         for i, contact in ipairs(PhoneData.SuggestedContacts) do
-            
             if type(contact.name) == "table" then
-                
                 local isNameMatch = (targetData.name[1] == contact.name[1] and targetData.name[2] == contact.name[2])
                 local isNumberMatch = (targetData.number == contact.number)
                 local isBankMatch = (targetData.bank == contact.bank)
@@ -1449,24 +1358,18 @@ RegisterNUICallback('RemoveSuggestion', function(payload, cb)
                     table.remove(PhoneData.SuggestedContacts, i)
                     break 
                 end
-                
             end
         end
     end
 
-    SetTimeout(500, function()
-        suggestionDeleteLock = false
-    end)
-
+    SetTimeout(500, function() suggestionDeleteLock = false end)
     cb('ok')
 end)
 
 local vehicleSearchLock = false
 
 RegisterNUICallback('FetchVehicleResults', function(data, cb)
-    if vehicleSearchLock then 
-        return cb({}) 
-    end
+    if vehicleSearchLock then return cb({}) end
 
     if type(data) ~= "table" or type(data.input) ~= "string" then
         print("^3[TMG Security]^7 Vehicle search aborted: Malformed UI payload.")
@@ -1474,14 +1377,11 @@ RegisterNUICallback('FetchVehicleResults', function(data, cb)
     end
 
     local query = string.match(data.input, "^%s*(.-)%s*$")
-    if not query or query == "" then 
-        return cb({}) 
-    end
+    if not query or query == "" then return cb({}) end
 
     vehicleSearchLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-phone:server:GetVehicleSearchResults', function(result)
-        
         if type(result) ~= "table" or #result == 0 then
             return cb({})
         end
@@ -1491,7 +1391,6 @@ RegisterNUICallback('FetchVehicleResults', function(data, cb)
         for i, veh in ipairs(result) do
             if type(veh) == "table" and type(veh.plate) == "string" then
                 pendingCallbacks = pendingCallbacks + 1
-                
                 TMGCore.Functions.TriggerCallback('police:IsPlateFlagged', function(flagged)
                     veh.isFlagged = (flagged == true) 
                     pendingCallbacks = pendingCallbacks - 1
@@ -1501,24 +1400,15 @@ RegisterNUICallback('FetchVehicleResults', function(data, cb)
 
         CreateThread(function()
             local timeout = 0
-            
             while pendingCallbacks > 0 and timeout < 30 do
                 Wait(100)
                 timeout = timeout + 1
             end
-
-            if timeout >= 30 then
-                print("^1[TMG Error]^7 Vehicle flag resolution timed out. Network under heavy load.")
-            end
-
             cb(result)
         end)
-        
     end, query)
 
-    SetTimeout(1000, function() 
-        vehicleSearchLock = false 
-    end)
+    SetTimeout(1000, function() vehicleSearchLock = false end)
 end)
 
 local vehicleScanLock = false
@@ -1527,7 +1417,6 @@ RegisterNUICallback('FetchVehicleScan', function(_, cb)
     if vehicleScanLock then return cb(false) end
 
     local vehicle = TMGCore.Functions.GetClosestVehicle()
-    
     if not vehicle or vehicle == 0 then
         TMGCore.Functions.Notify("Scanner Error: No vehicle detected in range.", "error")
         return cb(false) 
@@ -1545,60 +1434,42 @@ RegisterNUICallback('FetchVehicleScan', function(_, cb)
     local vehName = string.lower(GetDisplayNameFromVehicleModel(modelHash))
 
     TMGCore.Functions.TriggerCallback('tmg-phone:server:ScanPlate', function(scanResult)
-        
         if type(scanResult) ~= "table" then
             scanResult = { isOwned = false, plate = plate }
         end
 
         TMGCore.Functions.TriggerCallback('police:IsPlateFlagged', function(flagged)
-            
             scanResult.isFlagged = (flagged == true)
-
             local sharedVehData = TMGCore.Shared.Vehicles[vehName]
-            
             if type(sharedVehData) == "table" and type(sharedVehData.name) == "string" then
                 scanResult.label = sharedVehData.name
             else
                 scanResult.label = 'Unknown Brand'
             end
-
             cb(scanResult)
-
         end, plate)
-        
     end, plate)
 
-    SetTimeout(2000, function()
-        vehicleScanLock = false
-    end)
+    SetTimeout(2000, function() vehicleScanLock = false end)
 end)
 
 local listedRacesLock = false
 
 RegisterNUICallback('GetRaces', function(_, cb)
-    if listedRacesLock then
-        return cb({}) 
-    end
-
+    if listedRacesLock then return cb({}) end
     listedRacesLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-lapraces:server:GetListedRaces', function(races)
-        
         cb(type(races) == "table" and races or {})
-        
     end)
 
-    SetTimeout(1500, function()
-        listedRacesLock = false
-    end)
+    SetTimeout(1500, function() listedRacesLock = false end)
 end)
 
 local trackDataLock = false
 
 RegisterNUICallback('GetTrackData', function(data, cb)
-    if trackDataLock then
-        return cb({})
-    end
+    if trackDataLock then return cb({}) end
 
     if type(data) ~= "table" or type(data.RaceId) ~= "string" then
         print("^3[TMG Security]^7 Track data lookup aborted: Malformed payload matrix.")
@@ -1606,35 +1477,26 @@ RegisterNUICallback('GetTrackData', function(data, cb)
     end
 
     local raceId = string.match(data.RaceId, "^%s*(.-)%s*$")
-    if not raceId or raceId == "" then
-        return cb({})
-    end
+    if not raceId or raceId == "" then return cb({}) end
 
     trackDataLock = true
     TMGCore.Functions.TriggerCallback('tmg-lapraces:server:GetTrackData', function(trackData, creatorData)
-        
         if type(trackData) == "table" then
             trackData.CreatorData = type(creatorData) == "table" and creatorData or {}
-            
             cb(trackData)
         else
             cb({})
         end
-
     end, raceId)
 
-    SetTimeout(1000, function()
-        trackDataLock = false
-    end)
+    SetTimeout(1000, function() trackDataLock = false end)
 end)
 
 local raceSetupLock = false
 local creatorCheckLock = false
 
 RegisterNUICallback('SetupRace', function(data, cb)
-    if raceSetupLock then 
-        return cb('error') 
-    end
+    if raceSetupLock then return cb('error') end
 
     if type(data) ~= "table" or type(data.RaceId) ~= "string" then
         print("^3[TMG Security]^7 Race setup aborted: Malformed payload matrix.")
@@ -1645,60 +1507,38 @@ RegisterNUICallback('SetupRace', function(data, cb)
     local laps = tonumber(data.AmountOfLaps)
 
     if not raceId or raceId == "" or not laps or laps <= 0 then
-        print("^1[TMG Error]^7 Race setup failed: Invalid Race ID or Lap count.")
         return cb('error')
     end
 
     raceSetupLock = true
-
     TriggerServerEvent('tmg-lapraces:server:SetupRace', raceId, laps)
-
-    SetTimeout(1500, function() 
-        raceSetupLock = false 
-    end)
-
+    SetTimeout(1500, function() raceSetupLock = false end)
     cb('ok')
 end)
 
 RegisterNUICallback('HasCreatedRace', function(_, cb)
-    if creatorCheckLock then 
-        return cb(false) 
-    end
+    if creatorCheckLock then return cb(false) end
 
     creatorCheckLock = true
-
     TMGCore.Functions.TriggerCallback('tmg-lapraces:server:HasCreatedRace', function(hasCreated)
-        
         cb(hasCreated == true)
-        
     end)
 
-    SetTimeout(1000, function() 
-        creatorCheckLock = false 
-    end)
+    SetTimeout(1000, function() creatorCheckLock = false end)
 end)
 
 local raceStatusLock = false
 
 RegisterNUICallback('IsInRace', function(_, cb)
-    if raceStatusLock then
-        return cb(false)
-    end
-
+    if raceStatusLock then return cb(false) end
     raceStatusLock = true
 
     local success, inRace = pcall(function()
         return exports['tmg-lapraces']:IsInRace()
     end)
 
-    SetTimeout(500, function()
-        raceStatusLock = false
-    end)
-    if success and inRace == true then
-        cb(true)
-    else
-        cb(false)
-    end
+    SetTimeout(500, function() raceStatusLock = false end)
+    cb(success and inRace == true)
 end)
 
 local raceAuthLock = false
@@ -1721,34 +1561,25 @@ RegisterNUICallback('IsAuthorizedToCreateRaces', function(payload, cb)
     raceAuthLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-lapraces:server:IsAuthorizedToCreateRaces', function(isAuthorized, nameAvailable)
-        
         local success, inEditor = pcall(function()
             return exports['tmg-lapraces']:IsInEditor()
         end)
 
-        local safeResponse = {
+        cb({
             IsAuthorized = (isAuthorized == true),
             IsBusy = (success and inEditor == true),
             IsNameAvailable = (nameAvailable == true)
-        }
-
-        cb(safeResponse)
-        
+        })
     end, trackName)
 
-    SetTimeout(1000, function()
-        raceAuthLock = false
-    end)
+    SetTimeout(1000, function() raceAuthLock = false end)
 end)
-
 
 local editorLock = false
 local leaderboardLock = false
 
 RegisterNUICallback('StartTrackEditor', function(data, cb)
-    if editorLock then 
-        return cb('error') 
-    end
+    if editorLock then return cb('error') end
 
     if type(data) ~= "table" or type(data.TrackName) ~= "string" then
         print("^3[TMG Security]^7 Editor instantiation aborted: Malformed payload matrix.")
@@ -1756,47 +1587,29 @@ RegisterNUICallback('StartTrackEditor', function(data, cb)
     end
 
     local trackName = string.match(data.TrackName, "^%s*(.-)%s*$")
-    
-    if not trackName or trackName == "" then
-        print("^1[TMG Error]^7 Editor instantiation failed: Track name cannot be blank.")
-        return cb('error')
-    end
+    if not trackName or trackName == "" then return cb('error') end
 
     editorLock = true
-
     TriggerServerEvent('tmg-lapraces:server:CreateLapRace', trackName)
-
-    SetTimeout(1500, function() 
-        editorLock = false 
-    end)
-
+    SetTimeout(1500, function() editorLock = false end)
     cb('ok')
 end)
 
 RegisterNUICallback('GetRacingLeaderboards', function(_, cb)
-    if leaderboardLock then 
-        return cb({}) 
-    end
-
+    if leaderboardLock then return cb({}) end
     leaderboardLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-lapraces:server:GetRacingLeaderboards', function(leaderboards)
-        
         cb(type(leaderboards) == "table" and leaderboards or {})
-        
     end)
 
-    SetTimeout(2000, function() 
-        leaderboardLock = false 
-    end)
+    SetTimeout(2000, function() leaderboardLock = false end)
 end)
 
 local raceDistanceLock = false
 
 RegisterNUICallback('RaceDistanceCheck', function(data, cb)
-    if raceDistanceLock then
-        return cb(false)
-    end
+    if raceDistanceLock then return cb(false) end
 
     if type(data) ~= "table" or type(data.RaceId) ~= "string" then
         print("^3[TMG Security]^7 Distance check aborted: Malformed payload matrix.")
@@ -1804,38 +1617,27 @@ RegisterNUICallback('RaceDistanceCheck', function(data, cb)
     end
 
     local raceId = string.match(data.RaceId, "^%s*(.-)%s*$")
-    if not raceId or raceId == "" then
-        return cb(false)
-    end
+    if not raceId or raceId == "" then return cb(false) end
 
     raceDistanceLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-lapraces:server:GetRacingData', function(raceData)
-        
         if type(raceData) ~= "table" or 
            type(raceData.Checkpoints) ~= "table" or 
            type(raceData.Checkpoints[1]) ~= "table" or 
            type(raceData.Checkpoints[1].coords) ~= "table" then
-            
-            print("^1[TMG Error]^7 Distance check failed: Corrupted or missing track telemetry.")
             return cb(false)
         end
 
         local cpCoords = raceData.Checkpoints[1].coords
         local cpX = tonumber(cpCoords.x)
         local cpY = tonumber(cpCoords.y)
-        local cpZ = tonumber(cpCoords.z)
 
-        if not cpX or not cpY or not cpZ then
-            print("^1[TMG Error]^7 Distance check failed: Invalid spatial integers.")
-            return cb(false)
-        end
+        if not cpX or not cpY then return cb(false) end
 
         local ped = PlayerPedId()
         local pCoords = GetEntityCoords(ped)
-        local targetVector = vector3(cpX, cpY, cpZ)
-        
-        local dist = #(pCoords - targetVector)
+        local dist = #(pCoords - vector3(cpX, cpY, tonumber(cpCoords.z) or 0.0))
 
         if dist <= 115.0 then
             if data.Joined == true then
@@ -1843,24 +1645,19 @@ RegisterNUICallback('RaceDistanceCheck', function(data, cb)
             end
             cb(true)
         else
-            TMGCore.Functions.Notify("GPS Error: You are too far from the starting line. Rerouting...", "error", 5000)
+            TMGCore.Functions.Notify("GPS Error: You are too far from the starting line.", "error", 5000)
             SetNewWaypoint(cpX, cpY)
             cb(false)
         end
-        
     end, raceId)
 
-    SetTimeout(2000, function()
-        raceDistanceLock = false
-    end)
+    SetTimeout(2000, function() raceDistanceLock = false end)
 end)
 
 local busyCheckLock = false
 
 RegisterNUICallback('IsBusyCheck', function(data, cb)
-    if busyCheckLock then
-        return cb(false)
-    end
+    if busyCheckLock then return cb(false) end
 
     if type(data) ~= "table" or type(data.check) ~= "string" then
         print("^3[TMG Security]^7 Busy check aborted: Malformed payload matrix.")
@@ -1868,26 +1665,18 @@ RegisterNUICallback('IsBusyCheck', function(data, cb)
     end
 
     busyCheckLock = true
-
     local route = string.lower(data.check)
     local isBusy = false
 
     if route == 'editor' then
-        local success, inEditor = pcall(function()
-            return exports['tmg-lapraces']:IsInEditor()
-        end)
+        local success, inEditor = pcall(function() return exports['tmg-lapraces']:IsInEditor() end)
         isBusy = (success and inEditor == true)
     else
-        local success, inRace = pcall(function()
-            return exports['tmg-lapraces']:IsInRace()
-        end)
+        local success, inRace = pcall(function() return exports['tmg-lapraces']:IsInRace() end)
         isBusy = (success and inRace == true)
     end
 
-    SetTimeout(500, function()
-        busyCheckLock = false
-    end)
-
+    SetTimeout(500, function() busyCheckLock = false end)
     cb(isBusy)
 end)
 
@@ -1897,37 +1686,28 @@ local keysLock = false
 
 RegisterNUICallback('CanRaceSetup', function(_, cb)
     if setupAuthLock then return cb(false) end
-    
     setupAuthLock = true
-
     TMGCore.Functions.TriggerCallback('tmg-lapraces:server:CanRaceSetup', function(canSetup)
         cb(canSetup == true)
     end)
-
     SetTimeout(1000, function() setupAuthLock = false end)
 end)
 
 RegisterNUICallback('GetPlayerHouses', function(_, cb)
     if propertiesLock then return cb({}) end
-    
     propertiesLock = true
-
     TMGCore.Functions.TriggerCallback('tmg-phone:server:GetPlayerHouses', function(houses)
         cb(type(houses) == "table" and houses or {})
     end)
-
     SetTimeout(1500, function() propertiesLock = false end)
 end)
 
 RegisterNUICallback('GetPlayerKeys', function(_, cb)
     if keysLock then return cb({}) end
-    
     keysLock = true
-
     TMGCore.Functions.TriggerCallback('tmg-phone:server:GetHouseKeys', function(keys)
         cb(type(keys) == "table" and keys or {})
     end)
-
     SetTimeout(1500, function() keysLock = false end)
 end)
 
@@ -1942,8 +1722,6 @@ RegisterNUICallback('SetHouseLocation', function(data, cb)
        type(data.HouseData.HouseData) ~= "table" or 
        type(data.HouseData.HouseData.coords) ~= "table" or 
        type(data.HouseData.HouseData.coords.enter) ~= "table" then
-        
-        print("^3[TMG Security]^7 GPS Routing aborted: Corrupted property matrix.")
         return cb('error')
     end
 
@@ -1951,18 +1729,11 @@ RegisterNUICallback('SetHouseLocation', function(data, cb)
     local destX = tonumber(targetHouse.coords.enter.x)
     local destY = tonumber(targetHouse.coords.enter.y)
 
-    local addressName = type(targetHouse.adress) == "string" and targetHouse.adress or "Unknown Property"
-
-    if not destX or not destY then
-        print("^1[TMG Error]^7 GPS Routing failed: Invalid spatial integers.")
-        return cb('error')
-    end
+    if not destX or not destY then return cb('error') end
 
     houseLocationLock = true
-
     SetNewWaypoint(destX, destY)
-    TMGCore.Functions.Notify('GPS Protocol active: Routing to ' .. addressName, 'success')
-
+    TMGCore.Functions.Notify('GPS Protocol active: Routing to property', 'success')
     SetTimeout(1000, function() houseLocationLock = false end)
     cb('ok')
 end)
@@ -1974,8 +1745,6 @@ RegisterNUICallback('RemoveKeyholder', function(data, cb)
        type(data.HouseData) ~= "table" or 
        type(data.HolderData) ~= "table" or 
        type(data.HolderData.charinfo) ~= "table" then
-        
-        print("^3[TMG Security]^7 Keyholder removal aborted: Malformed payload matrix.")
         return cb('error')
     end
 
@@ -1983,12 +1752,10 @@ RegisterNUICallback('RemoveKeyholder', function(data, cb)
     local targetCitizenId = data.HolderData.citizenid
 
     if type(houseName) ~= "string" or houseName == "" or type(targetCitizenId) ~= "string" or targetCitizenId == "" then
-        print("^1[TMG Error]^7 Keyholder removal failed: Missing house identifier or Citizen ID.")
         return cb('error')
     end
 
     removeKeyholderLock = true
-
     local cleanHolderData = {
         citizenid = targetCitizenId,
         firstname = type(data.HolderData.charinfo.firstname) == "string" and data.HolderData.charinfo.firstname or "Unknown",
@@ -1996,7 +1763,6 @@ RegisterNUICallback('RemoveKeyholder', function(data, cb)
     }
 
     TriggerServerEvent('tmg-houses:server:removeHouseKey', houseName, cleanHolderData)
-
     SetTimeout(1500, function() removeKeyholderLock = false end)
     cb('ok')
 end)
@@ -2005,66 +1771,40 @@ local propertyTransferLock = false
 local meosSearchLock = false
 
 RegisterNUICallback('TransferCid', function(data, cb)
-    if propertyTransferLock then 
-        return cb(false) 
-    end
+    if propertyTransferLock then return cb(false) end
 
     if type(data) ~= "table" or 
        type(data.newBsn) ~= "string" or 
        type(data.HouseData) ~= "table" or 
        type(data.HouseData.name) ~= "string" then
-        
-        print("^3[TMG Security]^7 Property transfer aborted: Malformed payload matrix.")
         return cb(false)
     end
 
     local targetCid = string.match(data.newBsn, "^%s*(.-)%s*$")
-    
-    if not targetCid or targetCid == "" then
-        print("^1[TMG Error]^7 Property transfer failed: Invalid target Citizen ID.")
-        return cb(false)
-    end
+    if not targetCid or targetCid == "" then return cb(false) end
 
     propertyTransferLock = true
-
     TMGCore.Functions.TriggerCallback('tmg-phone:server:TransferCid', function(canTransfer)
-        
         cb(canTransfer == true)
-        
     end, targetCid, data.HouseData)
 
-    SetTimeout(1500, function() 
-        propertyTransferLock = false 
-    end)
+    SetTimeout(1500, function() propertyTransferLock = false end)
 end)
 
 RegisterNUICallback('FetchPlayerHouses', function(data, cb)
-    if meosSearchLock then 
-        return cb({}) 
-    end
+    if meosSearchLock then return cb({}) end
 
-    if type(data) ~= "table" or type(data.input) ~= "string" then
-        print("^3[TMG Security]^7 MEOS Search aborted: Malformed payload.")
-        return cb({})
-    end
+    if type(data) ~= "table" or type(data.input) ~= "string" then return cb({}) end
 
     local query = string.match(data.input, "^%s*(.-)%s*$")
-    
-    if not query or query == "" then 
-        return cb({}) 
-    end
+    if not query or query == "" then return cb({}) end
 
     meosSearchLock = true
-
     TMGCore.Functions.TriggerCallback('tmg-phone:server:MeosGetPlayerHouses', function(result)
-        
         cb(type(result) == "table" and result or {})
-        
     end, query)
 
-    SetTimeout(1000, function() 
-        meosSearchLock = false 
-    end)
+    SetTimeout(1000, function() meosSearchLock = false end)
 end)
 
 local gpsRoutingLock = false
@@ -2072,24 +1812,15 @@ local gpsRoutingLock = false
 RegisterNUICallback('SetGPSLocation', function(data, cb)
     if gpsRoutingLock then return cb('error') end
 
-    if type(data) ~= "table" or type(data.coords) ~= "table" then
-        print("^3[TMG Security]^7 Standard GPS routing aborted: Malformed payload matrix.")
-        return cb('error')
-    end
+    if type(data) ~= "table" or type(data.coords) ~= "table" then return cb('error') end
 
     local destX = tonumber(data.coords.x)
     local destY = tonumber(data.coords.y)
-
-    if not destX or not destY then
-        print("^1[TMG Error]^7 Standard GPS routing failed: Invalid spatial integers.")
-        return cb('error')
-    end
+    if not destX or not destY then return cb('error') end
 
     gpsRoutingLock = true
-
     SetNewWaypoint(destX, destY)
     TMGCore.Functions.Notify('GPS Protocol active: Destination set.', 'success')
-
     SetTimeout(1000, function() gpsRoutingLock = false end)
     cb('ok')
 end)
@@ -2101,35 +1832,26 @@ RegisterNUICallback('SetApartmentLocation', function(data, cb)
        type(data.data) ~= "table" or 
        type(data.data.appartmentdata) ~= "table" or 
        type(data.data.appartmentdata.type) ~= "string" then
-        
-        print("^3[TMG Security]^7 Apartment routing aborted: Corrupted payload matrix.")
         return cb('error')
     end
 
     local aptType = data.data.appartmentdata.type
-
-    local typeData = Apartments.Locations[aptType]
+    local typeData = Apartments and Apartments.Locations and Apartments.Locations[aptType]
     
     if type(typeData) ~= "table" or 
        type(typeData.coords) ~= "table" or 
        type(typeData.coords.enter) ~= "table" then
-        
-        print("^1[TMG Error]^7 Apartment routing failed: Invalid dictionary configuration.")
         return cb('error')
     end
 
     local destX = tonumber(typeData.coords.enter.x)
     local destY = tonumber(typeData.coords.enter.y)
 
-    if not destX or not destY then
-        return cb('error')
-    end
+    if not destX or not destY then return cb('error') end
 
     gpsRoutingLock = true
-
     SetNewWaypoint(destX, destY)
     TMGCore.Functions.Notify('GPS Protocol active: Routing to apartment.', 'success')
-
     SetTimeout(1000, function() gpsRoutingLock = false end)
     cb('ok')
 end)
@@ -2138,32 +1860,22 @@ local lawyerSyncLock = false
 local storeSetupLock = false
 
 RegisterNUICallback('GetCurrentLawyers', function(_, cb)
-    if lawyerSyncLock then 
-        return cb({}) 
-    end
-
+    if lawyerSyncLock then return cb({}) end
     lawyerSyncLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-phone:server:GetCurrentLawyers', function(lawyers)
         cb(type(lawyers) == "table" and lawyers or {})
-        
     end)
 
-    SetTimeout(1500, function() 
-        lawyerSyncLock = false 
-    end)
+    SetTimeout(1500, function() lawyerSyncLock = false end)
 end)
 
 RegisterNUICallback('SetupStoreApps', function(_, cb)
-    if storeSetupLock then 
-        return cb({}) 
-    end
+    if storeSetupLock then return cb({}) end
 
     local player = TMGCore.Functions.GetPlayerData()
 
     if type(player) ~= "table" or type(player.metadata) ~= "table" then
-        print("^1[TMG Error]^7 Store initialization failed: Player metadata corrupted or loading.")
-        
         return cb({
             StoreApps = type(Config.StoreApps) == "table" and Config.StoreApps or {},
             PhoneData = {}
@@ -2171,36 +1883,24 @@ RegisterNUICallback('SetupStoreApps', function(_, cb)
     end
 
     storeSetupLock = true
-
-    local setupMatrix = {
+    cb({
         StoreApps = type(Config.StoreApps) == "table" and Config.StoreApps or {},
         PhoneData = type(player.metadata['phonedata']) == "table" and player.metadata['phonedata'] or {}
-    }
+    })
 
-    cb(setupMatrix)
-
-    SetTimeout(500, function() 
-        storeSetupLock = false 
-    end)
+    SetTimeout(500, function() storeSetupLock = false end)
 end)
 
 local alertClearLock = false
 
 RegisterNUICallback('ClearMentions', function(_, cb)
-    if alertClearLock then 
-        return cb('error') 
-    end
+    if alertClearLock then return cb('error') end
 
-    if type(Config) ~= "table" or 
-       type(Config.PhoneApplications) ~= "table" or 
-       type(Config.PhoneApplications['twitter']) ~= "table" then
-        
-        print("^1[TMG Error]^7 Mention clearance failed: Application configuration missing.")
+    if type(Config) ~= "table" or type(Config.PhoneApplications) ~= "table" or type(Config.PhoneApplications['twitter']) ~= "table" then
         return cb('error')
     end
 
     alertClearLock = true
-
     Config.PhoneApplications['twitter'].Alerts = 0
 
     SendNUIMessage({
@@ -2209,38 +1909,23 @@ RegisterNUICallback('ClearMentions', function(_, cb)
     })
 
     TriggerServerEvent('tmg-phone:server:SetPhoneAlerts', 'twitter', 0)
-
-    SetTimeout(1000, function() 
-        alertClearLock = false 
-    end)
-
+    SetTimeout(1000, function() alertClearLock = false end)
     cb('ok')
 end)
 
 local generalAlertLock = false
 
 RegisterNUICallback('ClearGeneralAlerts', function(data, cb)
-    if generalAlertLock then 
-        return cb('error') 
-    end
+    if generalAlertLock then return cb('error') end
 
-    if type(data) ~= "table" or type(data.app) ~= "string" then
-        print("^3[TMG Security]^7 Alert clearance aborted: Malformed payload matrix.")
-        return cb('error')
-    end
+    if type(data) ~= "table" or type(data.app) ~= "string" then return cb('error') end
 
     local targetApp = string.lower(data.app)
-
-    if type(Config) ~= "table" or 
-       type(Config.PhoneApplications) ~= "table" or 
-       type(Config.PhoneApplications[targetApp]) ~= "table" then
-        
-        print("^1[TMG Error]^7 Alert clearance failed: Application '" .. targetApp .. "' not found in configuration.")
+    if type(Config) ~= "table" or type(Config.PhoneApplications) ~= "table" or type(Config.PhoneApplications[targetApp]) ~= "table" then
         return cb('error')
     end
 
     generalAlertLock = true
-
     Config.PhoneApplications[targetApp].Alerts = 0
 
     SendNUIMessage({
@@ -2249,11 +1934,7 @@ RegisterNUICallback('ClearGeneralAlerts', function(data, cb)
     })
 
     TriggerServerEvent('tmg-phone:server:SetPhoneAlerts', targetApp, 0)
-
-    SetTimeout(500, function() 
-        generalAlertLock = false 
-    end)
-
+    SetTimeout(500, function() generalAlertLock = false end)
     cb('ok')
 end)
 
@@ -2265,17 +1946,14 @@ RegisterNUICallback('TransferMoney', function(data, cb)
     end
 
     if type(data) ~= "table" or type(data.iban) ~= "string" or not tonumber(data.amount) then
-        print("^3[TMG Security]^7 Wire transfer aborted: Malformed payload matrix.")
         return cb({ CanTransfer = false, NewAmount = PhoneData.PlayerData.money.bank })
     end
 
     local transferAmount = tonumber(data.amount)
     local targetIban = string.match(data.iban, "^%s*(.-)%s*$") 
-    
     local currentBankBalance = tonumber(PhoneData.PlayerData.money.bank) or 0
 
     if transferAmount <= 0 or targetIban == "" then
-        print("^1[TMG Error]^7 Wire transfer failed: Invalid amount or destination IBAN.")
         return cb({ CanTransfer = false, NewAmount = currentBankBalance })
     end
 
@@ -2285,7 +1963,6 @@ RegisterNUICallback('TransferMoney', function(data, cb)
     end
 
     bankTransferLock = true
-
     local newBalance = currentBankBalance - transferAmount
     
     TriggerServerEvent('tmg-phone:server:TransferMoney', targetIban, transferAmount)
@@ -2295,20 +1972,15 @@ RegisterNUICallback('TransferMoney', function(data, cb)
         NewAmount = newBalance
     })
 
-    SetTimeout(1500, function()
-        bankTransferLock = false
-    end)
+    SetTimeout(1500, function() bankTransferLock = false end)
 end)
 
 local transferVerifyLock = false
 
 RegisterNUICallback('CanTransferMoney', function(data, cb)
-    if transferVerifyLock then
-        return cb({ TransferedMoney = false })
-    end
+    if transferVerifyLock then return cb({ TransferedMoney = false }) end
 
     if type(data) ~= "table" or type(data.sendTo) ~= "string" or not tonumber(data.amountOf) then
-        print("^3[TMG Security]^7 Transfer verification aborted: Malformed payload matrix.")
         return cb({ TransferedMoney = false })
     end
 
@@ -2316,19 +1988,15 @@ RegisterNUICallback('CanTransferMoney', function(data, cb)
     local targetIban = string.match(data.sendTo, "^%s*(.-)%s*$") 
 
     if transferAmount <= 0 or not targetIban or targetIban == "" then
-        print("^1[TMG Error]^7 Transfer verification failed: Invalid amount or empty destination IBAN.")
         return cb({ TransferedMoney = false })
     end
 
     local player = TMGCore.Functions.GetPlayerData()
-    
     if type(player) ~= "table" or type(player.money) ~= "table" or not tonumber(player.money.bank) then
-        print("^1[TMG Error]^7 Transfer verification failed: Player financial data corrupted.")
         return cb({ TransferedMoney = false })
     end
 
     local currentBankBalance = tonumber(player.money.bank)
-
     if (currentBankBalance - transferAmount) < 0 then
         return cb({ TransferedMoney = false })
     end
@@ -2336,7 +2004,6 @@ RegisterNUICallback('CanTransferMoney', function(data, cb)
     transferVerifyLock = true
 
     TMGCore.Functions.TriggerCallback('tmg-phone:server:CanTransferMoney', function(isAuthorized)
-        
         if isAuthorized == true then
             cb({ 
                 TransferedMoney = true, 
@@ -2353,39 +2020,25 @@ RegisterNUICallback('CanTransferMoney', function(data, cb)
                     color = '#E74C3C', 
                 } 
             })
-            
             cb({ TransferedMoney = false })
         end
-        
     end, transferAmount, targetIban)
 
-    SetTimeout(1000, function()
-        transferVerifyLock = false
-    end)
+    SetTimeout(1000, function() transferVerifyLock = false end)
 end)
 
 local whatsappSyncLock = false
 
 RegisterNUICallback('GetWhatsappChats', function(_, cb)
-    if whatsappSyncLock then
-        return cb({})
-    end
-
-    if type(PhoneData.Chats) ~= "table" then
-        return cb({})
-    end
+    if whatsappSyncLock then return cb({}) end
+    if type(PhoneData.Chats) ~= "table" then return cb({}) end
 
     whatsappSyncLock = true
-
     TMGCore.Functions.TriggerCallback('tmg-phone:server:GetContactPictures', function(hydratedChats)
-        
         cb(type(hydratedChats) == "table" and hydratedChats or {})
-        
     end, PhoneData.Chats)
 
-    SetTimeout(2000, function()
-        whatsappSyncLock = false
-    end)
+    SetTimeout(2000, function() whatsappSyncLock = false end)
 end)
 
 local outboundCallLock = false
@@ -2396,7 +2049,6 @@ RegisterNUICallback('CallContact', function(data, cb)
     end
 
     if type(data) ~= "table" or type(data.ContactData) ~= "table" or type(data.ContactData.number) ~= "string" then
-        print("^3[TMG Security]^7 Outbound call aborted: Malformed payload matrix.")
         return cb({ CanCall = false, IsOnline = false, InCall = false })
     end
 
@@ -2404,8 +2056,6 @@ RegisterNUICallback('CallContact', function(data, cb)
        type(PhoneData.CallData) ~= "table" or 
        type(PhoneData.PlayerData) ~= "table" or 
        type(PhoneData.PlayerData.charinfo) ~= "table" then
-        
-        print("^1[TMG Error]^7 Outbound call failed: Local telephony cache corrupted.")
         return cb({ CanCall = false, IsOnline = false, InCall = false })
     end
 
@@ -2418,29 +2068,23 @@ RegisterNUICallback('CallContact', function(data, cb)
 
     outboundCallLock = true
 
-    TMGCore.Functions.TriggerCallback('tmg-phone:server:GetCallState', function(canCall, isOnline, _)
-        
+    TMGCore.Functions.TriggerCallback('tmg-phone:server:GetCallState', function(canCall, isOnline)
         local targetAvailable = (canCall == true)
         local targetOnline = (isOnline == true)
         local currentCallState = (PhoneData.CallData.InCall == true)
 
-        local status = {
+        cb({
             CanCall = targetAvailable,
             IsOnline = targetOnline,
             InCall = currentCallState,
-        }
-
-        cb(status)
+        })
 
         if targetAvailable and not currentCallState and (targetNumber ~= myNumber) then
             CallContact(data.ContactData, data.Anonymous == true)
         end
-
     end, data.ContactData)
 
-    SetTimeout(2500, function()
-        outboundCallLock = false
-    end)
+    SetTimeout(2500, function() outboundCallLock = false end)
 end)
 
 local sendMessageLock = false
@@ -2449,12 +2093,10 @@ RegisterNUICallback('SendMessage', function(data, cb)
     if sendMessageLock then return cb('error') end
 
     if type(data) ~= "table" or type(data.ChatNumber) ~= "string" or type(data.ChatType) ~= "string" then
-        print("^3[TMG Security]^7 Message dispatch aborted: Malformed payload matrix.")
         return cb('error')
     end
 
     if type(PhoneData) ~= "table" or type(PhoneData.PlayerData) ~= "table" then
-        print("^1[TMG Error]^7 Message dispatch failed: Local telephony cache corrupted.")
         return cb('error')
     end
 
@@ -2485,7 +2127,6 @@ RegisterNUICallback('SendMessage', function(data, cb)
     end
 
     PhoneData.Chats = type(PhoneData.Chats) == "table" and PhoneData.Chats or {}
-    
     local numberKey = GetKeyByNumber(chatNumber)
     local isNewChat = false
 
@@ -2501,7 +2142,6 @@ RegisterNUICallback('SendMessage', function(data, cb)
 
     local chatThread = PhoneData.Chats[numberKey]
     chatThread.messages = type(chatThread.messages) == "table" and chatThread.messages or {}
-
     local chatKey = GetKeyByDate(numberKey, chatDate)
 
     if not chatKey or type(chatThread.messages[chatKey]) ~= "table" then
@@ -2529,7 +2169,6 @@ RegisterNUICallback('SendMessage', function(data, cb)
     end, PhoneData.Chats[GetKeyByNumber(chatNumber)])
 
     SetTimeout(500, function() sendMessageLock = false end)
-    
     cb('ok')
 end)
 
@@ -2544,7 +2183,6 @@ local function SaveToInternalGallery(cb)
     photoCaptureLock = true
 
     CreateThread(function()
-        
         BeginTakeHighQualityPhoto()
 
         local timeout = 0
@@ -2560,16 +2198,11 @@ local function SaveToInternalGallery(cb)
             SaveHighQualityPhoto(0)
             if cb then cb(true, "Photo captured successfully.") end
         else
-            print("^1[TMG Error]^7 Camera pipeline failed. Engine status: " .. tostring(engineStatus))
             if cb then cb(false, "Hardware error: Failed to capture photo.") end
         end
 
         FreeMemoryForHighQualityPhoto()
-
-        SetTimeout(1000, function()
-            photoCaptureLock = false
-        end)
-        
+        SetTimeout(1000, function() photoCaptureLock = false end)
     end)
 end
 
@@ -2607,7 +2240,6 @@ RegisterNUICallback('TakePhoto', function(_, cb)
                 takePhoto = false
                 DestroyMobilePhone()
                 CellCamActivate(false, false)
-                
                 cb(json.encode({ url = nil }))
                 cameraActiveLock = false
                 Wait(500)
@@ -2617,7 +2249,6 @@ RegisterNUICallback('TakePhoto', function(_, cb)
                 takePhoto = false 
                 DestroyMobilePhone()
                 CellCamActivate(false, false)
-
                 ProcessNetworkUpload(cb)
             end
             
@@ -2719,7 +2350,6 @@ RegisterCommand('ping', function(_, args)
     end
 
     pingCommandLock = true
-
     TriggerServerEvent('tmg-phone:server:sendPing', targetId)
     TMGCore.Functions.Notify('Location ping dispatched to Server ID: ' .. targetId, 'success')
 
@@ -2728,7 +2358,40 @@ RegisterCommand('ping', function(_, args)
     end)
 end, false)
 
+RegisterNetEvent('tmg-phone:client:ReceivePing', function(senderData)
+    if type(senderData) ~= "table" then return end
+    
+    local safeName = (type(senderData.name) == "string" and senderData.name ~= "") and senderData.name or "A Player"
+    
+    SendNUIMessage({
+        action = 'PhoneNotification',
+        PhoneNotify = {
+            title = 'GPS Signal Received',
+            text = safeName .. ' shared their location with you.',
+            icon = 'fas fa-map-marker-alt',
+            color = '#3498db',
+            timeout = 5000,
+        },
+    })
+    
+    if type(senderData.coords) == "table" and senderData.coords.x and senderData.coords.y then
+        SetNewWaypoint(senderData.coords.x + 0.0, senderData.coords.y + 0.0)
+    end
+end)
 
+RegisterNetEvent('tmg-phone:client:CallContactError', function()
+    CancelCall()
+    SendNUIMessage({
+        action = 'PhoneNotification',
+        PhoneNotify = {
+            title = 'Phone',
+            text = 'Subscriber unavailable or offline.',
+            icon = 'fas fa-phone-slash',
+            color = '#e84118',
+            timeout = 3000,
+        },
+    })
+end)
 
 RegisterNetEvent('TMGCore:Client:OnPlayerLoaded', function()
     CreateThread(function()
@@ -2738,15 +2401,12 @@ RegisterNetEvent('TMGCore:Client:OnPlayerLoaded', function()
         
         while (not PlayerData or type(PlayerData.metadata) ~= "table") and attempts < maxAttempts do
             attempts = attempts + 1
-            print(string.format("^3[TMG Telemetry]^7 Phone awaiting BSON metadata synchronization... (Attempt %d/%d)", attempts, maxAttempts))
-            
             Wait(1000) 
             PlayerData = TMGCore.Functions.GetPlayerData()
         end
 
         if type(PlayerData) == "table" and type(PlayerData.metadata) == "table" then 
             TriggerServerEvent('tmg-phone:server:GetPhoneData')
-            
             print("^2[TMG System]^7 Cellular Interface Synchronized.")
         else
             print("^1[TMG Error]^7 Cellular boot aborted. BSON metadata failed to synchronize.")
@@ -2754,10 +2414,7 @@ RegisterNetEvent('TMGCore:Client:OnPlayerLoaded', function()
     end)
 end)
 
-
 RegisterNetEvent('TMGCore:Client:OnPlayerUnload', function()
-    print("^3[TMG System]^7 Initiating cellular wipe and session termination...")
-
     SetNuiFocus(false, false)
     DestroyMobilePhone()
     CellCamActivate(false, false)
@@ -2794,8 +2451,6 @@ RegisterNetEvent('TMGCore:Client:OnPlayerUnload', function()
     PhoneData.CryptoTransactions = {}
 
     ReleaseAllMainframeLocks()
-
-    print("^2[TMG System]^7 Cellular matrix wiped. Session terminated safely.^7")
 end)
 
 function ReleaseAllMainframeLocks()
@@ -2833,12 +2488,8 @@ function ReleaseAllMainframeLocks()
     cameraActiveLock = false
 end
 
-
 RegisterNetEvent('TMGCore:Client:OnJobUpdate', function(JobInfo)
-    if type(JobInfo) ~= "table" or type(JobInfo.name) ~= "string" then
-        print("^1[TMG Error]^7 Employment sync aborted: Corrupted job matrix received.")
-        return
-    end
+    if type(JobInfo) ~= "table" or type(JobInfo.name) ~= "string" then return end
 
     local appMatrix = (type(Config) == "table" and type(Config.PhoneApplications) == "table") 
                       and Config.PhoneApplications 
@@ -2851,58 +2502,20 @@ RegisterNetEvent('TMGCore:Client:OnJobUpdate', function(JobInfo)
         JobData = PlayerJob,
         applications = appMatrix
     })
-
-    print("^2[TMG System]^7 Cellular employment matrix synchronized: " .. PlayerJob.name)
 end)
 
-
-
 RegisterNetEvent('tmg-phone:client:TransferMoney', function(amount, newBalance)
-    local transferAmount = tonumber(amount)
-    local validatedBalance = tonumber(newBalance)
-
-    if not transferAmount or not validatedBalance then
-        print("^1[TMG Error]^7 Inbound financial telemetry rejected: Invalid numeric payload.")
-        return
-    end
-
-    if type(PhoneData) ~= "table" or 
-       type(PhoneData.PlayerData) ~= "table" or 
-       type(PhoneData.PlayerData.money) ~= "table" then
-        
-        print("^3[TMG Security]^7 Financial sync aborted: Local telemetry cache offline.")
-        return
-    end
-
-    PhoneData.PlayerData.money.bank = validatedBalance
-
-    local formattedAmount = string.format("%d", transferAmount)
-
-    SendNUIMessage({ 
-        action = 'PhoneNotification', 
-        PhoneNotify = { 
-            title = 'QBank', 
-            text = '&#36;' .. formattedAmount .. ' has been added to your account!', 
-            icon = 'fas fa-university', 
-            color = '#8c7ae6', 
-        } 
+    SendNUIMessage({
+        action = "UpdateBank",
+        NewBalance = newBalance
     })
-    
-    SendNUIMessage({ 
-        action = 'UpdateBank', 
-        NewBalance = validatedBalance 
-    })
+    TMGCore.Functions.Notify("Received $" .. amount .. " via bank transfer.", "success")
 end)
 
 RegisterNetEvent('tmg-phone:client:UpdateTweetsDel', function(senderSource, newTweetsMatrix)
-    if type(senderSource) ~= "number" or type(newTweetsMatrix) ~= "table" then
-        return
-    end
+    if type(senderSource) ~= "number" or type(newTweetsMatrix) ~= "table" then return end
 
-    if type(PhoneData) ~= "table" then
-        PhoneData = {}
-    end
-
+    if type(PhoneData) ~= "table" then PhoneData = {} end
     PhoneData.Tweets = newTweetsMatrix
 
     local myServerId = GetPlayerServerId(PlayerId())
@@ -2914,22 +2527,15 @@ RegisterNetEvent('tmg-phone:client:UpdateTweetsDel', function(senderSource, newT
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:client:UpdateTweets', function(senderSource, newTweetsMatrix, newTweetData, isDeleted)
-    if type(senderSource) ~= "number" or type(newTweetsMatrix) ~= "table" then
-        return
-    end
+    if type(senderSource) ~= "number" or type(newTweetsMatrix) ~= "table" then return end
 
-    if type(PhoneData) ~= "table" then
-        PhoneData = {}
-    end
-    
+    if type(PhoneData) ~= "table" then PhoneData = {} end
     PhoneData.Tweets = newTweetsMatrix
 
     local myServerId = GetPlayerServerId(PlayerId())
 
     if isDeleted == true then
-        
         if senderSource == myServerId then
             SendNUIMessage({
                 action = 'PhoneNotification',
@@ -2947,9 +2553,7 @@ RegisterNetEvent('tmg-phone:client:UpdateTweets', function(senderSource, newTwee
             action = 'UpdateTweets',
             Tweets = PhoneData.Tweets
         })
-
     else
-        
         if senderSource ~= myServerId then
             local fName = (type(newTweetData) == "table" and type(newTweetData.firstName) == "string") and newTweetData.firstName or "Unknown"
             local lName = (type(newTweetData) == "table" and type(newTweetData.lastName) == "string") and newTweetData.lastName or "User"
@@ -2984,12 +2588,7 @@ RegisterNetEvent('tmg-phone:client:UpdateTweets', function(senderSource, newTwee
 end)
 
 RegisterNetEvent('tmg-phone:client:RaceNotify', function(message)
-    local safeMessage = message
-
-    if type(safeMessage) ~= "string" or safeMessage == "" then
-        print("^3[TMG Security]^7 Racing telemetry intercepted: Invalid message payload coerced to default.")
-        safeMessage = "System Notice: Racing telemetry updated."
-    end
+    local safeMessage = type(message) == "string" and message or "System Notice: Racing telemetry updated."
 
     SendNUIMessage({
         action = 'PhoneNotification',
@@ -3004,10 +2603,7 @@ RegisterNetEvent('tmg-phone:client:RaceNotify', function(message)
 end)
 
 RegisterNetEvent('tmg-phone:client:AddRecentCall', function(callData, callTime, callDirection)
-    if type(callData) ~= "table" or type(callData.number) ~= "string" then
-        print("^1[TMG Error]^7 Call history sync aborted: Malformed telemetry payload.")
-        return
-    end
+    if type(callData) ~= "table" or type(callData.number) ~= "string" then return end
 
     if type(PhoneData) ~= "table" then PhoneData = {} end
     if type(PhoneData.RecentCalls) ~= "table" then PhoneData.RecentCalls = {} end
@@ -3025,10 +2621,7 @@ RegisterNetEvent('tmg-phone:client:AddRecentCall', function(callData, callTime, 
         anonymous = isAnonymous
     })
 
-    if type(Config) == "table" and 
-       type(Config.PhoneApplications) == "table" and 
-       type(Config.PhoneApplications['phone']) == "table" then
-        
+    if type(Config) == "table" and type(Config.PhoneApplications) == "table" and type(Config.PhoneApplications['phone']) == "table" then
         local currentAlerts = tonumber(Config.PhoneApplications['phone'].Alerts) or 0
         Config.PhoneApplications['phone'].Alerts = currentAlerts + 1
 
@@ -3038,18 +2631,11 @@ RegisterNetEvent('tmg-phone:client:AddRecentCall', function(callData, callTime, 
             action = 'RefreshAppAlerts',
             AppData = Config.PhoneApplications
         })
-    else
-        print("^3[TMG Security]^7 Call logged, but alert increment bypassed: 'phone' config missing.")
     end
 end)
 
 RegisterNetEvent('tmg-phone-new:client:BankNotify', function(text)
-    local safeText = text
-
-    if type(safeText) ~= "string" or safeText == "" then
-        print("^3[TMG Security]^7 Financial telemetry intercepted: Invalid message payload coerced to default.")
-        safeText = "System Notice: Financial transaction processed."
-    end
+    local safeText = type(text) == "string" and text or "System Notice: Financial transaction processed."
 
     SendNUIMessage({
         action = 'PhoneNotification',
@@ -3063,16 +2649,10 @@ RegisterNetEvent('tmg-phone-new:client:BankNotify', function(text)
     })
 end)
 
-
 RegisterNetEvent('tmg-phone:client:NewMailNotify', function(MailData)
-    if type(MailData) ~= "table" then
-        print("^1[TMG Error]^7 Mail sync aborted: Corrupted telemetry payload.")
-        return
-    end
+    if type(MailData) ~= "table" then return end
 
-    local safeSender = (type(MailData.sender) == "string" and MailData.sender ~= "") 
-                       and MailData.sender 
-                       or "Unknown Sender"
+    local safeSender = (type(MailData.sender) == "string" and MailData.sender ~= "") and MailData.sender or "Unknown Sender"
 
     SendNUIMessage({
         action = 'PhoneNotification',
@@ -3085,10 +2665,7 @@ RegisterNetEvent('tmg-phone:client:NewMailNotify', function(MailData)
         },
     })
 
-    if type(Config) == "table" and 
-       type(Config.PhoneApplications) == "table" and 
-       type(Config.PhoneApplications['mail']) == "table" then
-        
+    if type(Config) == "table" and type(Config.PhoneApplications) == "table" and type(Config.PhoneApplications['mail']) == "table" then
         local currentAlerts = tonumber(Config.PhoneApplications['mail'].Alerts) or 0
         Config.PhoneApplications['mail'].Alerts = currentAlerts + 1
 
@@ -3098,21 +2675,12 @@ RegisterNetEvent('tmg-phone:client:NewMailNotify', function(MailData)
             action = 'RefreshAppAlerts',
             AppData = Config.PhoneApplications
         })
-    else
-        print("^3[TMG Security]^7 Mail logged, but alert increment bypassed: 'mail' config missing.")
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:client:UpdateMails', function(NewMails)
-    if type(NewMails) ~= "table" then
-        print("^1[TMG Error]^7 Mail sync aborted: Corrupted telemetry payload.")
-        return
-    end
-
-    if type(PhoneData) ~= "table" then 
-        PhoneData = {} 
-    end
+    if type(NewMails) ~= "table" then return end
+    if type(PhoneData) ~= "table" then PhoneData = {} end
 
     PhoneData.Mails = NewMails
 
@@ -3122,16 +2690,9 @@ RegisterNetEvent('tmg-phone:client:UpdateMails', function(NewMails)
     })
 end)
 
-
 RegisterNetEvent('tmg-phone:client:UpdateAdvertsDel', function(AdvertsMatrix)
-    if type(AdvertsMatrix) ~= "table" then
-        print("^1[TMG Error]^7 Advert sync aborted: Corrupted telemetry payload.")
-        return
-    end
-
-    if type(PhoneData) ~= "table" then 
-        PhoneData = {} 
-    end
+    if type(AdvertsMatrix) ~= "table" then return end
+    if type(PhoneData) ~= "table" then PhoneData = {} end
 
     PhoneData.Adverts = AdvertsMatrix
 
@@ -3142,19 +2703,10 @@ RegisterNetEvent('tmg-phone:client:UpdateAdvertsDel', function(AdvertsMatrix)
 end)
 
 RegisterNetEvent('tmg-phone:client:UpdateAdverts', function(AdvertsMatrix, LastAdPublisher)
-    if type(AdvertsMatrix) ~= "table" then
-        print("^1[TMG Error]^7 Advert broadcast aborted: Corrupted telemetry payload.")
-        return
-    end
+    if type(AdvertsMatrix) ~= "table" then return end
+    if type(PhoneData) ~= "table" then PhoneData = {} end
 
-    if type(PhoneData) ~= "table" then 
-        PhoneData = {} 
-    end
-
-    local safePublisher = (type(LastAdPublisher) == "string" and LastAdPublisher ~= "") 
-                          and LastAdPublisher 
-                          or "an anonymous user"
-
+    local safePublisher = (type(LastAdPublisher) == "string" and LastAdPublisher ~= "") and LastAdPublisher or "an anonymous user"
     PhoneData.Adverts = AdvertsMatrix
 
     SendNUIMessage({
@@ -3175,24 +2727,14 @@ RegisterNetEvent('tmg-phone:client:UpdateAdverts', function(AdvertsMatrix, LastA
 end)
 
 RegisterNetEvent('tmg-phone:client:BillingEmail', function(data, isPaid, payerName)
-    if type(data) ~= "table" then
-        print("^1[TMG Error]^7 Billing telemetry aborted: Malformed payload matrix.")
-        return
-    end
+    if type(data) ~= "table" then return end
 
-    local safeName = (type(payerName) == "string" and payerName ~= "") 
-                     and payerName 
-                     or "an unknown citizen"
-                     
+    local safeName = (type(payerName) == "string" and payerName ~= "") and payerName or "an unknown citizen"
     local safeAmount = tonumber(data.amount) or 0
-
     local invoiceStatus = (isPaid == true) and "Paid" or "Declined"
 
     local emailSubject = string.format("Invoice %s", invoiceStatus)
-    local emailMessage = string.format("Invoice has been %s by %s in the amount of $%s", 
-                                       string.lower(invoiceStatus), 
-                                       safeName, 
-                                       safeAmount)
+    local emailMessage = string.format("Invoice has been %s by %s in the amount of $%s", string.lower(invoiceStatus), safeName, safeAmount)
 
     TriggerServerEvent('tmg-phone:server:sendNewMail', {
         sender = 'Billing Department',
@@ -3207,17 +2749,11 @@ RegisterNetEvent('tmg-phone:client:CancelCall', function()
     if type(PhoneData.AnimationData) ~= "table" then PhoneData.AnimationData = {} end
 
     if PhoneData.CallData.CallType == 'ongoing' then
-        SendNUIMessage({
-            action = 'CancelOngoingCall'
-        })
+        SendNUIMessage({ action = 'CancelOngoingCall' })
         
         if GetResourceState('pma-voice') == 'started' then
             local callId = tonumber(PhoneData.CallData.CallId)
-            if callId then
-                exports['pma-voice']:removePlayerFromCall(callId)
-            end
-        else
-            print("^3[TMG Security]^7 VoIP Teardown bypassed: 'pma-voice' resource is offline.")
+            if callId then exports['pma-voice']:removePlayerFromCall(callId) end
         end
     end
 
@@ -3246,43 +2782,25 @@ RegisterNetEvent('tmg-phone:client:CancelCall', function()
         timeout = 3500,
     }
 
-    if not PhoneData.isOpen then
-        SendNUIMessage({
-            action = 'PhoneNotification',
-            NotifyData = notificationMatrix,
-            PhoneNotify = notificationMatrix 
-        })
-    else
-        SendNUIMessage({
-            action = 'PhoneNotification',
-            NotifyData = notificationMatrix,
-            PhoneNotify = notificationMatrix
-        })
+    SendNUIMessage({
+        action = 'PhoneNotification',
+        NotifyData = notificationMatrix,
+        PhoneNotify = notificationMatrix 
+    })
 
-        SendNUIMessage({
-            action = 'SetupHomeCall',
-            CallData = PhoneData.CallData,
-        })
-
-        SendNUIMessage({
-            action = 'CancelOutgoingCall',
-        })
+    if PhoneData.isOpen then
+        SendNUIMessage({ action = 'SetupHomeCall', CallData = PhoneData.CallData })
+        SendNUIMessage({ action = 'CancelOutgoingCall' })
     end
 end)
 
 RegisterNetEvent('tmg-phone:client:GetCalled', function(CallerNumber, CallId, AnonymousCall)
-    if type(CallerNumber) ~= "string" or not CallId then
-        print("^1[TMG Error]^7 Inbound call rejected: Malformed network payload.")
-        return
-    end
+    if type(CallerNumber) ~= "string" or not CallId then return end
 
     if type(PhoneData) ~= "table" then PhoneData = {} end
     if type(PhoneData.CallData) ~= "table" then PhoneData.CallData = {} end
 
-    if PhoneData.CallData.InCall then
-        print("^3[TMG Security]^7 Inbound call rejected: Hardware is already busy.")
-        return
-    end
+    if PhoneData.CallData.InCall then return end
 
     local isAnonymous = (AnonymousCall == true)
     local safeName = isAnonymous and "Anonymous" or IsNumberInContacts(CallerNumber)
@@ -3312,7 +2830,6 @@ RegisterNetEvent('tmg-phone:client:GetCalled', function(CallerNumber, CallId, An
         local currentRing = 0
 
         while PhoneData.CallData.InCall and not PhoneData.CallData.AnsweredCall and currentRing < maxRings do
-            
             local callbackResolved = false
             local hasPhoneResult = false
 
@@ -3338,7 +2855,6 @@ RegisterNetEvent('tmg-phone:client:GetCalled', function(CallerNumber, CallId, An
                     end
                 end
             else
-                print("^3[TMG Security]^7 Ringing sequence aborted: Hardware no longer in inventory.")
                 break
             end
 
@@ -3353,17 +2869,12 @@ RegisterNetEvent('tmg-phone:client:GetCalled', function(CallerNumber, CallId, An
                 AnonymousCall = isAnonymous,
             })
             TriggerServerEvent('tmg-phone:server:AddRecentCall', 'missed', CallData)
-            
         end
     end)
 end)
 
-
 RegisterNetEvent('tmg-phone:client:UpdateMessages', function(ChatMessages, SenderNumber, _)
-    if type(ChatMessages) ~= "table" or type(SenderNumber) ~= "string" then
-        print("^1[TMG Error]^7 Message sync aborted: Corrupted telemetry payload.")
-        return
-    end
+    if type(ChatMessages) ~= "table" or type(SenderNumber) ~= "string" then return end
 
     if type(PhoneData) ~= "table" then PhoneData = {} end
     if type(PhoneData.Chats) ~= "table" then PhoneData.Chats = {} end
@@ -3381,7 +2892,6 @@ RegisterNetEvent('tmg-phone:client:UpdateMessages', function(ChatMessages, Sende
     end
 
     local activeChat = PhoneData.Chats[numberKey]
-
     activeChat.messages = ChatMessages
     activeChat.Unread = (tonumber(activeChat.Unread) or 0) + 1
 
@@ -3434,20 +2944,13 @@ RegisterNetEvent('tmg-phone:client:UpdateMessages', function(ChatMessages, Sende
                 action = 'RefreshAppAlerts',
                 AppData = Config.PhoneApplications
             })
-        else
-            print("^3[TMG Security]^7 Whatsapp logged, but alert increment bypassed: 'whatsapp' config missing.")
         end
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:client:RemoveBankMoney', function(amount)
     local transferAmount = tonumber(amount)
-
-    if not transferAmount or transferAmount <= 0 then
-        print("^3[TMG Security]^7 Outbound financial telemetry intercepted: Invalid payload dropped.")
-        return
-    end
+    if not transferAmount or transferAmount <= 0 then return end
 
     local formattedAmount = string.format("%d", transferAmount)
     local notificationText = string.format("$%s has been removed from your balance!", formattedAmount)
@@ -3464,23 +2967,16 @@ RegisterNetEvent('tmg-phone:client:RemoveBankMoney', function(amount)
     })
 end)
 
-
 local refreshPhoneLock = false
 
 RegisterNetEvent('tmg-phone:RefreshPhone', function()
-    if refreshPhoneLock then 
-        print("^3[TMG Security]^7 Hardware refresh suppressed: Interface is already rebooting.")
-        return 
-    end
+    if refreshPhoneLock then return end
 
     refreshPhoneLock = true
-    print("^3[TMG System]^7 Initiating cellular interface refresh...")
-
     LoadPhone()
 
     CreateThread(function()
         Wait(250)
-
         local safeAppMatrix = (type(Config) == "table" and type(Config.PhoneApplications) == "table") 
                               and Config.PhoneApplications 
                               or {}
@@ -3489,12 +2985,8 @@ RegisterNetEvent('tmg-phone:RefreshPhone', function()
             action = 'RefreshAlerts',
             AppData = safeAppMatrix,
         })
-        
-        print("^2[TMG System]^7 Cellular interface successfully synchronized.")
 
-        SetTimeout(2000, function()
-            refreshPhoneLock = false
-        end)
+        SetTimeout(2000, function() refreshPhoneLock = false end)
     end)
 end)
 
@@ -3531,12 +3023,8 @@ RegisterNetEvent('tmg-phone:client:AddTransaction', function(_, _, Message, Titl
     TriggerServerEvent('tmg-phone:server:AddTransaction', transactionMatrix)
 end)
 
-
 RegisterNetEvent('tmg-phone:client:AddNewSuggestion', function(SuggestionData)
-    if type(SuggestionData) ~= "table" then
-        print("^1[TMG Error]^7 Contact suggestion aborted: Corrupted telemetry payload.")
-        return
-    end
+    if type(SuggestionData) ~= "table" then return end
 
     if type(PhoneData) ~= "table" then PhoneData = {} end
     if type(PhoneData.SuggestedContacts) ~= "table" then PhoneData.SuggestedContacts = {} end
@@ -3554,10 +3042,7 @@ RegisterNetEvent('tmg-phone:client:AddNewSuggestion', function(SuggestionData)
         },
     })
 
-    if type(Config) == "table" and 
-       type(Config.PhoneApplications) == "table" and 
-       type(Config.PhoneApplications['phone']) == "table" then
-        
+    if type(Config) == "table" and type(Config.PhoneApplications) == "table" and type(Config.PhoneApplications['phone']) == "table" then
         local currentAlerts = tonumber(Config.PhoneApplications['phone'].Alerts) or 0
         Config.PhoneApplications['phone'].Alerts = currentAlerts + 1
 
@@ -3567,17 +3052,11 @@ RegisterNetEvent('tmg-phone:client:AddNewSuggestion', function(SuggestionData)
             action = 'RefreshAppAlerts',
             AppData = Config.PhoneApplications
         })
-    else
-        print("^3[TMG Security]^7 Suggestion logged, but alert increment bypassed: 'phone' config missing.")
     end
 end)
 
-
 RegisterNetEvent('tmg-phone:client:UpdateHashtags', function(Handle, msgData)
-    if type(Handle) ~= "string" or Handle == "" or type(msgData) ~= "table" then
-        print("^1[TMG Error]^7 Hashtag sync aborted: Corrupted telemetry payload.")
-        return
-    end
+    if type(Handle) ~= "string" or Handle == "" or type(msgData) ~= "table" then return end
 
     if type(PhoneData) ~= "table" then PhoneData = {} end
     if type(PhoneData.Hashtags) ~= "table" then PhoneData.Hashtags = {} end
@@ -3589,10 +3068,6 @@ RegisterNetEvent('tmg-phone:client:UpdateHashtags', function(Handle, msgData)
         }
     end
 
-    if type(PhoneData.Hashtags[Handle].messages) ~= "table" then
-        PhoneData.Hashtags[Handle].messages = {}
-    end
-
     table.insert(PhoneData.Hashtags[Handle].messages, msgData)
 
     SendNUIMessage({
@@ -3601,7 +3076,6 @@ RegisterNetEvent('tmg-phone:client:UpdateHashtags', function(Handle, msgData)
     })
 end)
 
-
 RegisterNetEvent('tmg-phone:client:AnswerCall', function()
     if type(PhoneData) ~= "table" then PhoneData = {} end
     if type(PhoneData.CallData) ~= "table" then PhoneData.CallData = {} end
@@ -3609,7 +3083,6 @@ RegisterNetEvent('tmg-phone:client:AnswerCall', function()
     local callData = PhoneData.CallData
 
     if (callData.CallType == 'incoming' or callData.CallType == 'outgoing') and callData.InCall and not callData.AnsweredCall then
-        
         callData.CallType = 'ongoing'
         callData.AnsweredCall = true
         callData.CallTime = 0
@@ -3627,19 +3100,12 @@ RegisterNetEvent('tmg-phone:client:AnswerCall', function()
 
         if GetResourceState('pma-voice') == 'started' then
             local callId = tonumber(callData.CallId)
-            if callId then
-                exports['pma-voice']:addPlayerToCall(callId)
-            else
-                print("^1[TMG Error]^7 VoIP routing failed: Invalid Call ID matrix.")
-            end
-        else
-            print("^3[TMG Security]^7 VoIP Connection bypassed: 'pma-voice' resource is offline.")
+            if callId then exports['pma-voice']:addPlayerToCall(callId) end
         end
 
         CreateThread(function()
             while PhoneData.CallData.AnsweredCall do
                 PhoneData.CallData.CallTime = PhoneData.CallData.CallTime + 1
-
                 local safeName = (type(PhoneData.CallData.TargetData) == "table" and type(PhoneData.CallData.TargetData.name) == "string") 
                                  and PhoneData.CallData.TargetData.name 
                                  or "Unknown Caller"
@@ -3649,11 +3115,9 @@ RegisterNetEvent('tmg-phone:client:AnswerCall', function()
                     Time = PhoneData.CallData.CallTime,
                     Name = safeName,
                 })
-
                 Wait(1000)
             end
         end)
-
     else
         callData.InCall = false
         callData.CallType = nil
@@ -3673,21 +3137,13 @@ RegisterNetEvent('tmg-phone:client:AnswerCall', function()
 end)
 
 RegisterNetEvent('tmg-phone:client:addPoliceAlert', function(alertMatrix)
-    if type(alertMatrix) ~= "table" then
-        print("^1[TMG Error]^7 Emergency dispatch aborted: Corrupted telemetry payload.")
-        return
-    end
-
+    if type(alertMatrix) ~= "table" then return end
     local playerData = TMGCore.Functions.GetPlayerData()
 
-    if type(playerData) ~= "table" or type(playerData.job) ~= "table" then
-        return 
-    end
-
+    if type(playerData) ~= "table" or type(playerData.job) ~= "table" then return end
     local localJobState = playerData.job
 
     if localJobState.name == 'police' and localJobState.onduty == true then
-        
         SendNUIMessage({
             action = 'AddPoliceAlert',
             alert = alertMatrix,
@@ -3704,63 +3160,39 @@ RegisterNetEvent('tmg-phone:client:GiveContactDetails', function()
     end
 
     local player, distance = TMGCore.Functions.GetClosestPlayer()
-
     if player == -1 or distance == -1 or distance > 2.5 then
         TMGCore.Functions.Notify('Transfer failed: No compatible devices in range.', 'error')
         return
     end
 
     local targetServerId = GetPlayerServerId(player)
-
-    if not targetServerId or targetServerId <= 0 then
-        print("^1[TMG Error]^7 Contact transfer aborted: Target entity lacks a valid network ID.")
-        return
-    end
+    if not targetServerId or targetServerId <= 0 then return end
 
     contactShareLock = true
-
     TriggerServerEvent('tmg-phone:server:GiveContactDetails', targetServerId)
     TMGCore.Functions.Notify('NFC Transfer Initiated...', 'success')
 
-    SetTimeout(3000, function()
-        contactShareLock = false
-    end)
+    SetTimeout(3000, function() contactShareLock = false end)
 end)
 
 local lapRaceSyncLock = false
 
 RegisterNetEvent('tmg-phone:client:UpdateLapraces', function()
     if lapRaceSyncLock then return end
-
     lapRaceSyncLock = true
 
-    SendNUIMessage({
-        action = 'UpdateRacingApp',
-    })
-
-    print("^2[TMG System]^7 Racing leaderboard matrix synchronized.")
-
-    SetTimeout(250, function()
-        lapRaceSyncLock = false
-    end)
+    SendNUIMessage({ action = 'UpdateRacingApp' })
+    SetTimeout(250, function() lapRaceSyncLock = false end)
 end)
 
-
 RegisterNetEvent('tmg-phone:client:GetMentioned', function(TweetMatrix, AppAlerts)
-    if type(TweetMatrix) ~= "table" then
-        print("^1[TMG Error]^7 Social media telemetry aborted: Corrupted payload matrix.")
-        return
-    end
+    if type(TweetMatrix) ~= "table" then return end
 
     if type(PhoneData) ~= "table" then PhoneData = {} end
     if type(PhoneData.MentionedTweets) ~= "table" then PhoneData.MentionedTweets = {} end
 
     local rawMessage = (type(TweetMatrix.message) == "string") and TweetMatrix.message or "Unknown interaction."
-    
-    local safeMessage = rawMessage
-    if type(escape_str) == "function" then
-        safeMessage = escape_str(rawMessage)
-    end
+    local safeMessage = escape_str(rawMessage)
 
     local safeTweet = {
         firstName = (type(TweetMatrix.firstName) == "string") and TweetMatrix.firstName or "Unknown",
@@ -3770,18 +3202,9 @@ RegisterNetEvent('tmg-phone:client:GetMentioned', function(TweetMatrix, AppAlert
         picture   = (type(TweetMatrix.picture) == "string") and TweetMatrix.picture or "default"
     }
 
-    if type(Config) == "table" and 
-       type(Config.PhoneApplications) == "table" and 
-       type(Config.PhoneApplications['twitter']) == "table" then
-        
+    if type(Config) == "table" and type(Config.PhoneApplications) == "table" and type(Config.PhoneApplications['twitter']) == "table" then
         Config.PhoneApplications['twitter'].Alerts = tonumber(AppAlerts) or 1
-        
-        SendNUIMessage({ 
-            action = 'RefreshAppAlerts', 
-            AppData = Config.PhoneApplications 
-        })
-    else
-        print("^3[TMG Security]^7 Mention logged, but alert increment bypassed: 'twitter' config missing.")
+        SendNUIMessage({ action = 'RefreshAppAlerts', AppData = Config.PhoneApplications })
     end
 
     table.insert(PhoneData.MentionedTweets, safeTweet)
@@ -3804,14 +3227,9 @@ RegisterNetEvent('tmg-phone:client:GetMentioned', function(TweetMatrix, AppAlert
 end)
 
 RegisterNetEvent('tmg-phone:refreshImages', function(imageMatrix)
-    if type(imageMatrix) ~= "table" then
-        print("^1[TMG Error]^7 Gallery sync aborted: Corrupted telemetry payload.")
-        return
-    end
+    if type(imageMatrix) ~= "table" then return end
+    if type(PhoneData) ~= "table" then PhoneData = {} end
 
-    if type(PhoneData) ~= "table" then 
-        PhoneData = {} 
-    end
     PhoneData.Images = imageMatrix
 
     SendNUIMessage({
@@ -3821,23 +3239,10 @@ RegisterNetEvent('tmg-phone:refreshImages', function(imageMatrix)
 end)
 
 RegisterNetEvent('tmg-phone:client:CustomNotification', function(title, text, icon, color, timeout)
-    
-    local safeTitle = (type(title) == "string" and title ~= "") 
-                      and title 
-                      or "System Notice"
-                      
-    local safeText  = (type(text) == "string" and text ~= "") 
-                      and text 
-                      or "Incoming telemetry received."
-                      
-    local safeIcon  = (type(icon) == "string" and icon ~= "") 
-                      and icon 
-                      or "fas fa-bell"
-                      
-    local safeColor = (type(color) == "string" and color ~= "") 
-                      and color 
-                      or "#ffffff"
-
+    local safeTitle = (type(title) == "string" and title ~= "") and title or "System Notice"
+    local safeText  = (type(text) == "string" and text ~= "") and text or "Incoming telemetry received."
+    local safeIcon  = (type(icon) == "string" and icon ~= "") and icon or "fas fa-bell"
+    local safeColor = (type(color) == "string" and color ~= "") and color or "#ffffff"
     local safeTimeout = tonumber(timeout) or 3500
 
     SendNUIMessage({
@@ -3852,15 +3257,12 @@ RegisterNetEvent('tmg-phone:client:CustomNotification', function(title, text, ic
     })
 end)
 
-
-
 CreateThread(function()
     while true do
         local threadSleep = 1000
 
         if type(PhoneData) == "table" and PhoneData.isOpen then
             local currentTime = CalculateTimeToDisplay()
-            
             if currentTime then
                 SendNUIMessage({
                     action = 'UpdateTime',
@@ -3882,7 +3284,6 @@ CreateThread(function()
         if LocalPlayer.state.isLoggedIn and type(PhoneData) == "table" then
             TMGCore.Functions.TriggerCallback('tmg-phone:server:GetPhoneData', function(pData)
                 if type(pData) == "table" and type(pData.PlayerContacts) == "table" then
-                    
                     if next(pData.PlayerContacts) ~= nil then
                         PhoneData.Contacts = pData.PlayerContacts
                     end

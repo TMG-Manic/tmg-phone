@@ -16,12 +16,12 @@ $(document).on('click', '.twitter-header-tab', function(e){
         $("."+PressedTwitterTab+"-tab").css({"display":"block"});
 
         if (PressedTwitterTab === "twitter-mentions") {
-            $.post('https://qb-phone/ClearMentions');
+            $.post('https://tmg-phone/ClearMentions');
         }
 
         if (PressedTwitterTab == "twitter-home") {
-            $.post('https://qb-phone/GetTweets', JSON.stringify({}), function(Tweets){
-                QB.Phone.Notifications.LoadTweets(Tweets);
+            $.post('https://tmg-phone/GetTweets', JSON.stringify({}), function(Tweets){
+                TMG.Phone.Notifications.LoadTweets(Tweets);
             });
         }
 
@@ -52,14 +52,14 @@ $(document).on('click', '.twitter-header-tab', function(e){
     } else if (CurrentTwitterTab == "twitter-home" && PressedTwitterTab == "twitter-home") {
         event.preventDefault();
 
-        $.post('https://qb-phone/GetTweets', JSON.stringify({}), function(Tweets){
-            QB.Phone.Notifications.LoadTweets(Tweets);
+        $.post('https://tmg-phone/GetTweets', JSON.stringify({}), function(Tweets){
+            TMG.Phone.Notifications.LoadTweets(Tweets);
         });
     } else if (CurrentTwitterTab == "twitter-mentions" && PressedTwitterTab == "twitter-mentions") {
         event.preventDefault();
 
-        $.post('https://qb-phone/GetMentionedTweets', JSON.stringify({}), function(MentionedTweets){
-            QB.Phone.Notifications.LoadMentionedTweets(MentionedTweets)
+        $.post('https://tmg-phone/GetMentionedTweets', JSON.stringify({}), function(MentionedTweets){
+            TMG.Phone.Notifications.LoadMentionedTweets(MentionedTweets)
         })
     }
 });
@@ -67,66 +67,72 @@ $(document).on('click', '.twitter-header-tab', function(e){
 $(document).on('click', '.twitter-new-tweet', function(e){
     e.preventDefault();
 
-    QB.Phone.Animations.TopSlideDown(".twitter-new-tweet-tab", 450, 0);
+    TMG.Phone.Animations.TopSlideDown(".twitter-new-tweet-tab", 450, 0);
 });
 
 $(document).on('click', '#take-pic', function (e) {
     e.preventDefault();
-    $.post('https://qb-phone/TakePhoto', JSON.stringify({}),function(url){
+    $.post('https://tmg-phone/TakePhoto', JSON.stringify({}),function(url){
         if(url){
             $('#tweet-new-url').val(url)
         }
     })
-    QB.Phone.Functions.Close();
+    TMG.Phone.Functions.Close();
 })
 
-QB.Phone.Notifications.LoadTweets = function(Tweets) {
+TMG.Phone.Notifications.LoadTweets = function(Tweets) {
     Tweets = Tweets.reverse();
     if (Tweets !== null && Tweets !== undefined && Tweets !== "" && Tweets.length > 0) {
         $(".twitter-home-tab").html("");
-        $.each(Tweets, function(i, Tweet){
-            var clean = DOMPurify.sanitize(Tweet.message , {
-                ALLOWED_TAGS: [],
-                ALLOWED_ATTR: []
-            });
-            if (clean == '') clean = 'Hmm, I shouldn\'t be able to do this...'
-            var TwtMessage = QB.Phone.Functions.FormatTwitterMessage(clean);
+        $.each(Tweets, function(i, Tweet) {
+            var clean = DOMPurify.sanitize(Tweet.message, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+            if (clean == '') clean = 'Hmm, I shouldn\'t be able to do this...';
+            var TwtMessage = TMG.Phone.Functions.FormatTwitterMessage(clean);
             var TimeAgo = moment(Tweet.date).format('MM/DD/YYYY hh:mm');
-
-            var TwitterHandle = Tweet.firstName + ' ' + Tweet.lastName
-            var PictureUrl = "./img/default.png"
-            if (Tweet.picture !== "default") {
-                PictureUrl = Tweet.picture
+            var TwitterHandle = Tweet.firstName + ' ' + Tweet.lastName;
+            var PictureUrl = "./img/default.png";
+            if (Tweet.picture && Tweet.picture !== "default") {
+                PictureUrl = Tweet.picture;
             }
 
-            if (Tweet.url == "") {
-                let TweetElement = '<div class="twitter-tweet" data-twtcid="'+Tweet.citizenid+'" data-twtid ="'+Tweet.tweetId+'" data-twthandler="@' + TwitterHandle.replace(" ", "_") + '"><div class="tweet-reply"><i class="fas fa-reply"></i></div>' +
+            var deleteBtn = "";
+            if (TMG.Phone.Data.PlayerData && Tweet.citizenid === TMG.Phone.Data.PlayerData.citizenid) {
+                deleteBtn = '<div class="twt-icon"><i class="fas fa-trash twt-delete-click" style="position:absolute; right:2%; font-size: 1.2rem; z-index:4; cursor:pointer;"></i></div>';
+            }
+
+            var TweetElement = "";
+            if (!Tweet.url || Tweet.url == "") {
+                TweetElement = '<div class="twitter-tweet" data-twtcid="' + Tweet.citizenid + '" data-twtid="' + Tweet.tweetId + '" data-twthandler="@' + TwitterHandle.replace(" ", "_") + '"><div class="tweet-reply"><i class="fas fa-reply"></i></div>' +
                     '<div class="tweet-tweeter">' + Tweet.firstName + ' ' + Tweet.lastName + ' &nbsp;<span>@' + TwitterHandle.replace(" ", "_") + ' &middot; ' + TimeAgo + '</span></div>' +
-                    '<div class="tweet-message">' + TwtMessage + '</div>' +
+                    '<div class="tweet-message">' + TwtMessage + deleteBtn + '</div>' +
                     '<div class="twt-img" style="top: 1vh;"><img src="' + PictureUrl + '" class="tweeter-image"></div>' +
                     '</div>';
-                    $(".twitter-home-tab").append(TweetElement);
             } else {
-                let TweetElement = '<div class="twitter-tweet" data-twthandler="@'+TwitterHandle.replace(" ", "_")+'"><div class="tweet-reply"><i class="fas fa-reply"></i></div>'+
-                    '<div class="tweet-tweeter">'+Tweet.firstName+' '+Tweet.lastName+' &nbsp;<span>@'+TwitterHandle.replace(" ", "_")+' &middot; '+TimeAgo+'</span></div>'+
-                    '<div class="tweet-message">'+TwtMessage+'</div>'+
-                    '<img class="image" src= ' + Tweet.url + ' style = " border-radius:4px; width: 70%; position:relative; z-index: 1; left:52px; margin:.6rem .5rem .6rem 1rem;height: auto; padding-bottom: 15px;">' +
-                    '<div class="twt-img" style="top: 1vh;"><img src="'+PictureUrl+'" class="tweeter-image"></div>' +
+                TweetElement = '<div class="twitter-tweet" data-twtcid="' + Tweet.citizenid + '" data-twtid="' + Tweet.tweetId + '" data-twthandler="@' + TwitterHandle.replace(" ", "_") + '"><div class="tweet-reply"><i class="fas fa-reply"></i></div>' +
+                    '<div class="tweet-tweeter">' + Tweet.firstName + ' ' + Tweet.lastName + ' &nbsp;<span>@' + TwitterHandle.replace(" ", "_") + ' &middot; ' + TimeAgo + '</span></div>' +
+                    '<div class="tweet-message">' + TwtMessage + deleteBtn + '</div>' +
+                    '<img class="image" src="' + Tweet.url + '" style="border-radius:4px; width: 70%; position:relative; z-index: 1; left:52px; margin:.6rem .5rem .6rem 1rem; height: auto; padding-bottom: 15px;">' +
+                    '<div class="twt-img" style="top: 1vh;"><img src="' + PictureUrl + '" class="tweeter-image"></div>' +
                     '</div>';
-                $(".twitter-home-tab").append(TweetElement);
             }
-            // if (Tweet.citizenid === QB.Phone.Data.PlayerData.citizenid){
-            //     $(".tweet-message").append('<span><div class="twt-icon"><i class="fas fa-trash"style="position:absolute; right:2%; font-size: 1.5rem; z-index:4;" id ="twt-delete-click"></i></div>')
-            // }
+            $(".twitter-home-tab").append(TweetElement);
         });
     }
-}
+};
+
+$(document).on('click', '.twt-delete-click', function(e) {
+    e.preventDefault();
+    var tweetElement = $(this).closest('.twitter-tweet');
+    var tweetId = $(tweetElement).data('twtid');
+    $(tweetElement).remove();
+    $.post('https://tmg-phone/DeleteTweet', JSON.stringify({ id: tweetId }));
+});
 
 $(document).on('click','#twt-delete-click',function(e){
     e.preventDefault();
     let source = $('.twitter-tweet').data('twtid')
     $(this).parent().parent().parent().parent().remove()
-    $.post('https://qb-phone/DeleteTweet', JSON.stringify({id: source}))
+    $.post('https://tmg-phone/DeleteTweet', JSON.stringify({id: source}))
 })
 
 $(document).on('click', '.tweet-reply', function(e){
@@ -134,10 +140,10 @@ $(document).on('click', '.tweet-reply', function(e){
     var TwtName = $(this).parent().data('twthandler');
     $('#tweet-new-url').val("");
     $("#tweet-new-message").val(TwtName + " ");
-    QB.Phone.Animations.TopSlideDown(".twitter-new-tweet-tab", 450, 0);
+    TMG.Phone.Animations.TopSlideDown(".twitter-new-tweet-tab", 450, 0);
 });
 
-QB.Phone.Notifications.LoadMentionedTweets = function(Tweets) {
+TMG.Phone.Notifications.LoadMentionedTweets = function(Tweets) {
     Tweets = Tweets.reverse();
     $('#tweet-new-url').val("");
     if (Tweets.length > 0) {
@@ -148,7 +154,7 @@ QB.Phone.Notifications.LoadMentionedTweets = function(Tweets) {
                 ALLOWED_ATTR: []
             });
             if (clean == '') clean = 'Hmm, I shouldn\'t be able to do this...'
-            var TwtMessage = QB.Phone.Functions.FormatTwitterMessage(clean);
+            var TwtMessage = TMG.Phone.Functions.FormatTwitterMessage(clean);
             var TimeAgo = moment(Tweet.date).format('MM/DD/YYYY hh:mm');
 
             var TwitterHandle = Tweet.firstName + ' ' + Tweet.lastName
@@ -169,7 +175,7 @@ QB.Phone.Notifications.LoadMentionedTweets = function(Tweets) {
     }
 }
 
-QB.Phone.Functions.FormatTwitterMessage = function(TwitterMessage) {
+TMG.Phone.Functions.FormatTwitterMessage = function(TwitterMessage) {
     var TwtMessage = TwitterMessage;
     var res = TwtMessage.split("@");
     var tags = TwtMessage.split("#");
@@ -215,20 +221,20 @@ $(document).on('click', '#send-tweet', function(e){
     var imageURL = $('#tweet-new-url').val()
     if (TweetMessage != "") {
         var CurrentDate = new Date();
-        $.post('https://qb-phone/PostNewTweet', JSON.stringify({
+        $.post('https://tmg-phone/PostNewTweet', JSON.stringify({
             Message: TweetMessage,
             Date: CurrentDate,
-            Picture: QB.Phone.Data.MetaData.profilepicture,
+            Picture: TMG.Phone.Data.MetaData.profilepicture,
             url: imageURL
         }), function(Tweets){
-            QB.Phone.Notifications.LoadTweets(Tweets);
+            TMG.Phone.Notifications.LoadTweets(Tweets);
         });
-        $.post('https://qb-phone/GetHashtags', JSON.stringify({}), function(Hashtags){
-            QB.Phone.Notifications.LoadHashtags(Hashtags)
+        $.post('https://tmg-phone/GetHashtags', JSON.stringify({}), function(Hashtags){
+            TMG.Phone.Notifications.LoadHashtags(Hashtags)
         })
-        QB.Phone.Animations.TopSlideUp(".twitter-new-tweet-tab", 450, -120);
+        TMG.Phone.Animations.TopSlideUp(".twitter-new-tweet-tab", 450, -120);
     } else {
-        QB.Phone.Notifications.Add("fab fa-twitter", "Twitter", "Fill a message!", "#1DA1F2");
+        TMG.Phone.Notifications.Add("fab fa-twitter", "Twitter", "Fill a message!", "#1DA1F2");
     };
     $('#tweet-new-url').val("");
     $("#tweet-new-message").val("");
@@ -237,13 +243,13 @@ $(document).on('click', '#send-tweet', function(e){
 $(document).on('click', '#cancel-tweet', function(e){
     e.preventDefault();
     $('#tweet-new-url').html("");
-    QB.Phone.Animations.TopSlideUp(".twitter-new-tweet-tab", 450, -120);
+    TMG.Phone.Animations.TopSlideUp(".twitter-new-tweet-tab", 450, -120);
 });
 
 $(document).on('click', '.image', function(e){
     e.preventDefault();
     let source = $(this).attr('src')
-    QB.Screen.popUp(source)
+    TMG.Screen.popUp(source)
 });
 
 $(document).on('click', '.mentioned-tag', function(e){
@@ -263,8 +269,8 @@ $(document).on('click', '.hashtag-tag-text', function(e){
         $("."+CurrentTwitterTab+"-tab").css({"display":"none"});
         $(".twitter-hashtags-tab").css({"display":"block"});
 
-        $.post('https://qb-phone/GetHashtagMessages', JSON.stringify({hashtag: Hashtag}), function(HashtagData){
-            QB.Phone.Notifications.LoadHashtagMessages(HashtagData.messages);
+        $.post('https://tmg-phone/GetHashtagMessages', JSON.stringify({hashtag: Hashtag}), function(HashtagData){
+            TMG.Phone.Notifications.LoadHashtagMessages(HashtagData.messages);
         });
 
         $(".twitter-hashtag-tweets").css({"display":"block", "left":"30vh"});
@@ -281,12 +287,12 @@ function CopyMentionTag(elem) {
     var $temp = $("<input>");
     $("body").append($temp);
     $temp.val($(elem).data('mentiontag')).select();
-    QB.Phone.Notifications.Add("fab fa-twitter", "Twitter", $(elem).data('mentiontag')+ " copied!", "rgb(27, 149, 224)", 1250);
+    TMG.Phone.Notifications.Add("fab fa-twitter", "Twitter", $(elem).data('mentiontag')+ " copied!", "rgb(27, 149, 224)", 1250);
     document.execCommand("copy");
     $temp.remove();
 }
 
-QB.Phone.Notifications.LoadHashtags = function(hashtags) {
+TMG.Phone.Notifications.LoadHashtags = function(hashtags) {
     if (hashtags !== null) {
         $(".twitter-hashtags").html("");
 
@@ -308,7 +314,7 @@ QB.Phone.Notifications.LoadHashtags = function(hashtags) {
     }
 }
 
-QB.Phone.Notifications.LoadHashtagMessages = function(Tweets) {
+TMG.Phone.Notifications.LoadHashtagMessages = function(Tweets) {
     Tweets = Tweets.reverse();
     if (Tweets !== null && Tweets !== undefined && Tweets !== "" && Tweets.length > 0) {
         $(".twitter-hashtag-tweets").html("");
@@ -318,7 +324,7 @@ QB.Phone.Notifications.LoadHashtagMessages = function(Tweets) {
                 ALLOWED_ATTR: []
             });
             if (clean == '') clean = 'Hmm, I shouldn\'t be able to do this...'
-            var TwtMessage = QB.Phone.Functions.FormatTwitterMessage(clean);
+            var TwtMessage = TMG.Phone.Functions.FormatTwitterMessage(clean);
             var TimeAgo = moment(Tweet.date).format('MM/DD/YYYY hh:mm');
 
             var TwitterHandle = Tweet.firstName + ' ' + Tweet.lastName
@@ -345,7 +351,7 @@ $(document).on('click', '.twitter-hashtag', function(event){
     var TweetId = $(this).attr('id');
     var TweetData = $("#"+TweetId).data('tagData');
 
-    QB.Phone.Notifications.LoadHashtagMessages(TweetData.messages);
+    TMG.Phone.Notifications.LoadHashtagMessages(TweetData.messages);
 
     $(".twitter-hashtag-tweets").css({"display":"block", "left":"30vh"});
     $(".twitter-hashtag-tweets").animate({

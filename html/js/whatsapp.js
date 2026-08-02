@@ -29,9 +29,9 @@ $(document).on('click', '.whatsapp-chat', function(e){
     var ChatId = $(this).attr('id');
     var ChatData = $("#"+ChatId).data('chatdata');
 
-    QB.Phone.Functions.SetupChatMessages(ChatData);
+    TMG.Phone.Functions.SetupChatMessages(ChatData);
 
-    $.post('https://qb-phone/ClearAlerts', JSON.stringify({
+    $.post('https://tmg-phone/ClearAlerts', JSON.stringify({
         number: ChatData.number
     }));
 
@@ -63,8 +63,8 @@ $(document).on('click', '.whatsapp-chat', function(e){
 
 $(document).on('click', '#whatsapp-openedchat-back', function(e){
     e.preventDefault();
-    $.post('https://qb-phone/GetWhatsappChats', JSON.stringify({}), function(chats){
-        QB.Phone.Functions.LoadWhatsappChats(chats);
+    $.post('https://tmg-phone/GetWhatsappChats', JSON.stringify({}), function(chats){
+        TMG.Phone.Functions.LoadWhatsappChats(chats);
     });
     OpenedChatData.number = null;
     $(".whatsapp-chats").css({"display":"block"});
@@ -79,7 +79,7 @@ $(document).on('click', '#whatsapp-openedchat-back', function(e){
     OpenedChatPicture = null;
 });
 
-QB.Phone.Functions.GetLastMessage = function(messages) {
+TMG.Phone.Functions.GetLastMessage = function(messages) {
     var CurrentDate = new Date();
     var CurrentMonth = CurrentDate.getMonth();
     var CurrentDOM = CurrentDate.getDate();
@@ -112,14 +112,14 @@ GetCurrentDateKey = function() {
     return CurDate;
 }
 
-QB.Phone.Functions.LoadWhatsappChats = function(chats) {
+TMG.Phone.Functions.LoadWhatsappChats = function(chats) {
     $(".whatsapp-chats").html("");
     $.each(chats, function(i, chat){
         var profilepicture = "./img/default.png";
         if (chat.picture !== "default") {
             profilepicture = chat.picture
         }
-        var LastMessage = QB.Phone.Functions.GetLastMessage(chat.messages);
+        var LastMessage = TMG.Phone.Functions.GetLastMessage(chat.messages);
         var ChatElement = '<div class="whatsapp-chat" id="whatsapp-chat-'+i+'"><div class="whatsapp-chat-picture" style="background-image: url('+profilepicture+');"></div><div class="whatsapp-chat-name"><p>'+chat.name+'</p></div><div class="whatsapp-chat-lastmessage"><p>'+LastMessage.message+'</p></div> <div class="whatsapp-chat-lastmessagetime"><p>'+LastMessage.time+'</p></div><div class="whatsapp-chat-unreadmessages unread-chat-id-'+i+'">1</div></div>';
 
         $(".whatsapp-chats").append(ChatElement);
@@ -134,7 +134,7 @@ QB.Phone.Functions.LoadWhatsappChats = function(chats) {
     });
 }
 
-QB.Phone.Functions.ReloadWhatsappAlerts = function(chats) {
+TMG.Phone.Functions.ReloadWhatsappAlerts = function(chats) {
     $.each(chats, function(i, chat){
         if (chat.Unread > 0 && chat.Unread !== undefined && chat.Unread !== null) {
             $(".unread-chat-id-"+i).html(chat.Unread);
@@ -145,7 +145,7 @@ QB.Phone.Functions.ReloadWhatsappAlerts = function(chats) {
     });
 }
 
-const monthNames = ["January", "February", "March", "April", "May", "June", "JulY", "August", "September", "October", "November", "December"];
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 FormatChatDate = function(date) {
     var TestDate = date.split("-");
@@ -188,7 +188,7 @@ $(document).on('click', '#whatsapp-openedchat-send', function(e){
     var Message = $("#whatsapp-openedchat-message").val();
 
     if (Message !== null && Message !== undefined && Message !== "") {
-        $.post('https://qb-phone/SendMessage', JSON.stringify({
+        $.post('https://tmg-phone/SendMessage', JSON.stringify({
             ChatNumber: OpenedChatData.number,
             ChatDate: GetCurrentDateKey(),
             ChatMessage: Message,
@@ -198,7 +198,7 @@ $(document).on('click', '#whatsapp-openedchat-send', function(e){
         $("#whatsapp-openedchat-message").val("");
         $("div.emojionearea-editor").data("emojioneArea").setText('');
     } else {
-        QB.Phone.Notifications.Add("fab fa-whatsapp", "Whatsapp", "You can't send a empty message!", "#25D366", 1750);
+        TMG.Phone.Notifications.Add("fab fa-whatsapp", "Whatsapp", "You can't send a empty message!", "#25D366", 1750);
     }
 });
 
@@ -213,7 +213,7 @@ $(document).on('keypress', function (e) {
                     ALLOWED_ATTR: []
                 });
                 if (clean == '') clean = 'Hmm, I shouldn\'t be able to do this...'
-                $.post('https://qb-phone/SendMessage', JSON.stringify({
+                $.post('https://tmg-phone/SendMessage', JSON.stringify({
                     ChatNumber: OpenedChatData.number,
                     ChatDate: GetCurrentDateKey(),
                     ChatMessage: clean,
@@ -222,7 +222,7 @@ $(document).on('keypress', function (e) {
                 }));
                 $("#whatsapp-openedchat-message").val("");
             } else {
-                QB.Phone.Notifications.Add("fab fa-whatsapp", "Whatsapp", "You can't send a empty message!", "#25D366", 1750);
+                TMG.Phone.Notifications.Add("fab fa-whatsapp", "Whatsapp", "You can't send a empty message!", "#25D366", 1750);
             }
         }
     }
@@ -231,7 +231,7 @@ $(document).on('keypress', function (e) {
 $(document).on('click', '#send-location', function(e){
     e.preventDefault();
 
-    $.post('https://qb-phone/SendMessage', JSON.stringify({
+    $.post('https://tmg-phone/SendMessage', JSON.stringify({
         ChatNumber: OpenedChatData.number,
         ChatDate: GetCurrentDateKey(),
         ChatMessage: "Shared location",
@@ -243,9 +243,9 @@ $(document).on('click', '#send-location', function(e){
 $(document).on('click', '#send-image', function(e){
     e.preventDefault();
     let ChatNumber2 = OpenedChatData.number;
-    $.post('https://qb-phone/TakePhoto', JSON.stringify({}),function(url){
+    $.post('https://tmg-phone/TakePhoto', JSON.stringify({}),function(url){
         if(url){
-        $.post('https://qb-phone/SendMessage', JSON.stringify({
+        $.post('https://tmg-phone/SendMessage', JSON.stringify({
         ChatNumber: ChatNumber2,
         ChatDate: GetCurrentDateKey(),
         ChatMessage: "Photo",
@@ -253,15 +253,15 @@ $(document).on('click', '#send-image', function(e){
         ChatType: "picture",
         url : url
     }))}})
-    QB.Phone.Functions.Close();
+    TMG.Phone.Functions.Close();
 });
 
-QB.Phone.Functions.SetupChatMessages = function(cData, NewChatData) {
+TMG.Phone.Functions.SetupChatMessages = function(cData, NewChatData) {
     if (cData) {
         OpenedChatData.number = cData.number;
 
         if (OpenedChatPicture == null) {
-            $.post('https://qb-phone/GetProfilePicture', JSON.stringify({
+            $.post('https://tmg-phone/GetProfilePicture', JSON.stringify({
                 number: OpenedChatData.number,
             }), function(picture){
                 OpenedChatPicture = "./img/default.png";
@@ -291,7 +291,7 @@ QB.Phone.Functions.SetupChatMessages = function(cData, NewChatData) {
                 });
                 if (message.message == '') message.message = 'Hmm, I shouldn\'t be able to do this...'
                 var Sender = "me";
-                if (message.sender !== QB.Phone.Data.PlayerData.citizenid) { Sender = "other"; }
+                if (message.sender !== TMG.Phone.Data.PlayerData.citizenid) { Sender = "other"; }
                 var MessageElement
                 if (message.type == "message") {
                     MessageElement = '<div class="whatsapp-openedchat-message whatsapp-openedchat-message-'+Sender+'">'+message.message+'<div class="whatsapp-openedchat-message-time">'+message.time+'</div></div><div class="clearfix"></div>'
@@ -307,7 +307,7 @@ QB.Phone.Functions.SetupChatMessages = function(cData, NewChatData) {
     } else {
         OpenedChatData.number = NewChatData.number;
         if (OpenedChatPicture == null) {
-            $.post('https://qb-phone/GetProfilePicture', JSON.stringify({
+            $.post('https://tmg-phone/GetProfilePicture', JSON.stringify({
                 number: OpenedChatData.number,
             }), function(picture){
                 OpenedChatPicture = "./img/default.png";
@@ -339,7 +339,7 @@ $(document).on('click', '.whatsapp-shared-location', function(e){
     messageCoords.x = $(this).data('x');
     messageCoords.y = $(this).data('y');
 
-    $.post('https://qb-phone/SharedLocation', JSON.stringify({
+    $.post('https://tmg-phone/SharedLocation', JSON.stringify({
         coords: messageCoords,
     }))
 });
@@ -347,7 +347,7 @@ $(document).on('click', '.whatsapp-shared-location', function(e){
 $(document).on('click', '.wppimage', function(e){
     e.preventDefault();
     let source = $(this).attr('src')
-   QB.Screen.popUp(source)
+   TMG.Screen.popUp(source)
 });
 
 $(document).on('click', '#whatsapp-openedchat-message-extras', function(e){

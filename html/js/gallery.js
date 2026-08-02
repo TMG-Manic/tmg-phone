@@ -13,7 +13,7 @@ function setUpGalleryData(Images){
 $(document).on('click', '.tumbnail', function(e){
     e.preventDefault();
     let source = $(this).attr('src')
-    // QB.Screen.popUp(source)
+    // TMG.Screen.popUp(source)
     $(".gallery-homescreen").animate({
         left: 30+"vh"
     }, 200);
@@ -26,7 +26,7 @@ $(document).on('click', '.tumbnail', function(e){
 $(document).on('click', '.image', function(e){
     e.preventDefault();
     let source = $(this).attr('src')
-    QB.Screen.popUp(source)
+    TMG.Screen.popUp(source)
 });
 
 
@@ -35,10 +35,10 @@ $(document).on('click', '#delete-button', function(e){
     let source = $('.image').attr('src')
 
     setTimeout(() => {
-        $.post('https://qb-phone/DeleteImage', JSON.stringify({image:source}), function(Hashtags){
+        $.post('https://tmg-phone/DeleteImage', JSON.stringify({image:source}), function(Hashtags){
             setTimeout(()=>{
                 $('#return-button').click()
-                $.post('https://qb-phone/GetGalleryData', JSON.stringify({}), function(data){
+                $.post('https://tmg-phone/GetGalleryData', JSON.stringify({}), function(data){
                     setTimeout(()=>{
                             setUpGalleryData(data);
                         
@@ -64,7 +64,7 @@ $(document).on('click', '#make-post-button', function(e){
     let source = $('#imagedata').attr('src')
     postImageUrl=source
 
-    // QB.Screen.popUp(source)
+    // TMG.Screen.popUp(source)
     $(".gallery-detailscreen").animate({
         left: 30+"vh"
     }, 200);
@@ -102,29 +102,31 @@ function returnDetail(){
 }
 
 
-$(document).on('click', '#tweet-button', function(e){
+$(document).on('click', '#tweet-button', function(e) {
     e.preventDefault();
     var TweetMessage = $("#new-textarea").val();
-    var imageURL = postImageUrl
-    if (TweetMessage != "") {
+    var imageURL = postImageUrl;
+    if (TweetMessage && TweetMessage.trim() !== "") {
         var CurrentDate = new Date();
-        $.post('https://qb-phone/PostNewTweet', JSON.stringify({
+        var avatar = (TMG.Phone.Data && TMG.Phone.Data.MetaData && TMG.Phone.Data.MetaData.profilepicture) ? TMG.Phone.Data.MetaData.profilepicture : "default";
+        
+        $.post('https://tmg-phone/PostNewTweet', JSON.stringify({
             Message: TweetMessage,
             Date: CurrentDate,
-            Picture: QB.Phone.Data.MetaData.profilepicture,
+            Picture: avatar,
             url: imageURL
-        }), function(Tweets){
-            QB.Phone.Notifications.LoadTweets(Tweets);
+        }), function(Tweets) {
+            TMG.Phone.Notifications.LoadTweets(Tweets);
         });
-        var TweetMessage = $("#new-textarea").val(' ');
-        $.post('https://qb-phone/GetHashtags', JSON.stringify({}), function(Hashtags){
-            QB.Phone.Notifications.LoadHashtags(Hashtags)
-        })
-        // QB.Phone.Animations.TopSlideUp(".twitter-new-tweet-tab", 450, -120);
-        returnDetail()
+        
+        $("#new-textarea").val(' ');
+        $.post('https://tmg-phone/GetHashtags', JSON.stringify({}), function(Hashtags) {
+            TMG.Phone.Notifications.LoadHashtags(Hashtags);
+        });
+        returnDetail();
     } else {
-        QB.Phone.Notifications.Add("fab fa-twitter", "Twitter", "Fill a message!", "#1DA1F2");
-    };
+        TMG.Phone.Notifications.Add("fab fa-twitter", "Twitter", "Fill in a message!", "#1DA1F2");
+    }
     $('#tweet-new-url').val("");
     $("#tweet-new-message").val("");
 });
@@ -143,13 +145,13 @@ $(document).on('click', '#advert-button', function(e){
             left: -30+"vh"
         });
         if (!picture){
-            $.post('https://qb-phone/PostAdvert', JSON.stringify({
+            $.post('https://tmg-phone/PostAdvert', JSON.stringify({
                 message: Advert,
                 url: null
             }));
             returnDetail()
         }else {
-            $.post('https://qb-phone/PostAdvert', JSON.stringify({
+            $.post('https://tmg-phone/PostAdvert', JSON.stringify({
                 message: Advert,
                 url: picture
             }));
@@ -157,7 +159,7 @@ $(document).on('click', '#advert-button', function(e){
         }
         $("#new-textarea").val(' ');
     } else {
-        QB.Phone.Notifications.Add("fas fa-ad", "Advertisement", "You can\'t post an empty ad!", "#ff8f1a", 2000);
+        TMG.Phone.Notifications.Add("fas fa-ad", "Advertisement", "You can\'t post an empty ad!", "#ff8f1a", 2000);
     }
 });
 
